@@ -1,3 +1,7 @@
+"""
+to do fransje -> clearly write in-out of functions and steps
+"""
+
 import glob
 from pathlib import Path
 
