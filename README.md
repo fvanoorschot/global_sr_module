@@ -15,17 +15,19 @@ The following input data is needed:
 - GSIM catchment shapes (shapefile) (https://essd.copernicus.org/articles/10/765/2018/)
 
 # Codes
-The module consists of 3 run-scripts (jupyter notebooks) and several function scripts (.py)
+The module consists of three run-scripts (jupyter notebooks) and five function scripts (.py)
 
 **run scripts**
 1. *run_script_main* is the main run script that guides you through the entire calculation procedure.
-2. *run_script_grid_to_catchments* is used to extract catchment timeseries from the global gridded data. *run_script_main* tells you when to switch to this script.
-3. *run_script_earth_engine* is used to extracth catchment timeseries from satellite products using google earth engine. *run_script_main* tells you when to switch to this script.
+2. *run_script_grid_to_catchments* is used to extract catchment timeseries from the global gridded data. *run_script_main* tells you when to use this script.
+3. *run_script_earth_engine* is used to extracth catchment timeseries from satellite products using google earth engine. *run_script_main* tells you when to use this script.
 
 **function scripts**
-1. *f_*
-2. *f_*
-3. *f_*
+1. *f_preprocess_discharge* -> preprocessing GSIM discharge data
+2. *f_grid_to_catchments* -> extract catchment timeseries from gridded products
+3. *f_earth_engine* -> extract catchment average values from satellite products using Google Earth Engine
+4. *f_sr_calculation* -> calculate catchment root zone storage capacity based on catchment water balances
+5. *f_catch_characteristics* -> calculate catchment climate and landscape characteristics and store in table
 
 
 
