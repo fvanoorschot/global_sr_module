@@ -1,10 +1,17 @@
-#%
+"""
+
+to do fransje -> add clear explanations per function
+-> add more variables (ST-index, other EE products,....)
+
+
+"""
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import glob
 import os
 from scipy.optimize import least_squares
+
 
 def p_mean(df):
     m = df['P'].mean()
@@ -97,9 +104,9 @@ def q_mean(df_q):
     return m
 
 
-def catch_characteristics(var, catch_id, fol_in, fol_out):
-    cc = pd.DataFrame(index=catch_id, columns=var)
-    for j in catch_id:
+def catch_characteristics(var, catch_id_list, fol_in, fol_out):
+    cc = pd.DataFrame(index=catch_id_list, columns=var)
+    for j in catch_id_list:
         l = glob.glob(f'{fol_in}/forcing_timeseries/processed/daily/{j}*.csv')
         df = pd.read_csv(l[0], index_col=0)
         df.index = pd.to_datetime(df.index)
@@ -130,6 +137,14 @@ def catch_characteristics(var, catch_id, fol_in, fol_out):
         
         if 'phi' in var:
             cc.loc[j,'phi'] = phi(df)
+        
+        # treecover
+        if 'tc' in var:
+            l = glob.glob(f'{fol_in}/earth_engine_timeseries/treecover/{j}*.csv')
+            dft = pd.read_csv(l[0], index_col=0)
+            cc.loc[j,'tc'] = dft.loc[j,'mean_tc']
+            cc.loc[j,'ntc'] = dft.loc[j,'mean_ntc']
+            cc.loc[j,'nonveg'] = dft.loc[j,'mean_nonveg']
             
     cc.to_csv(f'{fol_out}/catchment_characteristics.csv')
     return cc

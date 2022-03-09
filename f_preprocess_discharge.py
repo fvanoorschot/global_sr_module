@@ -1,4 +1,7 @@
 """
+to do fransje-> clearly write function details
+
+
 COLUMN MEANINGS (see table 3 and 4 paper Gudmundsson part2 - https://essd.copernicus.org/articles/10/787/2018/)
 
 "MEAN"' -> mean yearly streamflow (m3/s)
