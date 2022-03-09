@@ -1,6 +1,40 @@
+"""
+COLUMN MEANINGS (see table 3 and 4 paper Gudmundsson part2 - https://essd.copernicus.org/articles/10/787/2018/)
+
+"MEAN"' -> mean yearly streamflow (m3/s)
+'"SD"' -> standard deviation of daily streamflow (m3/s)
+'"CV"' -> coefficient of variation of daily streamflow
+'"IQR"' -> inter quartile range of day-to-day streamflow variability (m3/s)
+'"MIN"' -> yearly minimum streamflow (m3/s)
+'"MAX"' -> yearly maximum streamflow (m3/s)
+'"MIN7"' -> minimum 7-day mean streamflow (m3/s)
+'"MAX7"' -> maximum 7-day mean streamflow (m3/s)
+'"P10"' -> percentiles of daily streamflow (m3/s)
+'"P20"'
+'"P30"'
+'"P40"'
+'"P50"'
+'"P60"'
+'"P70"'
+'"P80"'
+'"P90"'
+'"GINI"' -> gini coefficient
+'"CT"' -> centre timing
+'"DOYMIN"' -> day of year of minimum streamflow (doy)
+'"DOYMAX"' -> day of year of maximum streamflow (doy)
+'"DOYMIN7"' -> day of year of minimum 7daily streamflow (doy)
+'"DOYMAX7"' -> day of year of maximum 7daily streamflow (doy)
+'"n.missing"' -> number of missing/suspect daily values (#days)
+"n.available" -> number of used daily values (#days)
+
+"""
+
+
 import numpy as np
 import pandas as pd
 import glob
+
+# to do fransje: clarify function in out and steps
 
 def preprocess_gsim_discharge(catch_id, fol_in, fol_out):
     catch_id_c = catch_id.upper()
