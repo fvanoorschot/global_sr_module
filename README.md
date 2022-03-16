@@ -14,7 +14,7 @@ The following input data is needed:
 - GSIM catchment yearly discharge timeseries (https://essd.copernicus.org/articles/10/787/2018/)
 - GSIM catchment shapes (shapefile) (https://essd.copernicus.org/articles/10/765/2018/)
 
-# Codes
+# Running
 The module consists of three run-scripts (jupyter notebooks) and five function scripts (.py)
 
 **run scripts**
@@ -29,5 +29,7 @@ The module consists of three run-scripts (jupyter notebooks) and five function s
 4. *f_sr_calculation* -> calculate catchment root zone storage capacity based on catchment water balances
 5. *f_catch_characteristics* -> calculate catchment climate and landscape characteristics and store in table
 
+# Examples
+*add this*
 
 
