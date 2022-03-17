@@ -6,6 +6,7 @@ This module can be used to calculate root zone storage capacities globally.
 # Installation
 This module requires a linux environment because it uses python packages that are only compatible with linux. When you are working on windows10, you could use WSL. Detailed steps on how to use this module in WSL are provided here: https://docs.google.com/document/d/1-NzAk0YgFRNr7qcqgXqP1tij6xgiNaLK2S2uuHJIlV4/edit?usp=sharing 
 
+The basic steps to use this module in miniconda are as follows:
 1. Install miniconda in your home directory and activate (https://docs.conda.io/en/latest/miniconda.html)
 - *wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh*
 - *bash ~/Miniconda3-latest-Linux-x86_64.sh*
