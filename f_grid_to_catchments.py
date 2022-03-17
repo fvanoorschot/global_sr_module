@@ -4,7 +4,7 @@ to do fransje -> clearly write in-out of functions and steps
 
 import glob
 from pathlib import Path
-
+import os
 import geopandas as gpd
 import iris
 import iris.pandas
@@ -15,6 +15,7 @@ from iris.cube import Cube
 from pathos.threading import ThreadPool as Pool
 from datetime import datetime
 from datetime import timedelta
+import pandas as pd
 
 
 def regridding_target_cube(catchment_shapefile, spatial_resolution, buffer=1):
