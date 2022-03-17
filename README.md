@@ -36,7 +36,7 @@ The module consists of three run-scripts (jupyter notebooks) and five function s
 **run scripts**
 1. *run_script_main* is the main run script that guides you through the entire calculation procedure.
 2. *run_script_grid_to_catchments* is used to extract catchment timeseries from the global gridded data. *run_script_main* tells you when to use this script.
-3. *run_script_earth_engine* is used to extracth catchment timeseries from satellite products using google earth engine. *run_script_main* tells you when to use this script.
+3. *run_script_earth_engine* is used to extract catchment timeseries from satellite products using google earth engine. *run_script_main* tells you when to use this script.
 
 **function scripts**
 1. *f_preprocess_discharge* -> preprocessing GSIM discharge data
