@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import glob
 import os
 from scipy.optimize import least_squares
+import geopandas as gpd
 
 
 def p_mean(df):
@@ -148,3 +149,15 @@ def catch_characteristics(var, catch_id_list, fol_in, fol_out):
             
     cc.to_csv(f'{fol_out}/catchment_characteristics.csv')
     return cc
+
+def geo_catchments(shape_dir,out_dir):
+    shapefiles = glob.glob(f"{shape_dir}/*shp")
+    li=[]
+    for filename in shapefiles:
+        df = gpd.read_file(filename, index_col=None, header=0)
+        li.append(df)
+    f = pd.concat(li, axis=0)
+    f = f.rename(columns={'FILENAME':'catch_id'})
+    f.index = f['catch_id']
+    f = f.drop(columns={'catch_id','Id'})
+    f.to_file(f'{out_dir}/geo_catchments.shp')

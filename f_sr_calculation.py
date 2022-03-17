@@ -7,6 +7,9 @@ from datetime import datetime
 from datetime import timedelta
 import pandas as pd
 import calendar
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import cartopy
 
 
 #%% SR CALCULATION
@@ -240,3 +243,40 @@ def run_sr_calculation(catch_id,RP,sd_dir,out_dir):
         sr_df.loc[catch_id]=sr_T
         sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
         return(sr_df)
+    
+def merge_sr_catchments(sr_dir,out_dir):
+    all_files = glob.glob(f'{sr_dir}/*.csv')
+    li = []
+
+    for filename in all_files:
+        df = pd.read_csv(filename, index_col=None, header=0)
+        li.append(df)
+    frame = pd.concat(li, axis=0)
+    frame = frame.rename(columns={'Unnamed: 0':'catch_id'})
+    frame.index = frame['catch_id']
+    frame = frame.drop(columns={'catch_id'})
+    frame.to_csv(f'{out_dir}/sr_all_catchments.csv')
+    
+def plot_sr(shp_file,sr_file):
+    df = pd.read_csv(sr_file,index_col=0)
+    
+    sh = gpd.read_file(shp_file,index_col=0)
+    sh.index = sh.catch_id
+    sh = sh.drop(columns=['catch_id'])
+    sh['sr'] = df['20']
+    sh['centroid'] = sh.centroid
+    sh = sh.drop(columns='geometry')
+    sh = sh.rename(columns={'centroid':'geometry'})
+
+    fig = plt.figure(figsize=(12,12))
+    cm = plt.cm.get_cmap('jet')
+    ax = plt.axes(projection=cartopy.crs.PlateCarree())
+    ax.coastlines(linestyle=':')
+    ax.set_xlim(-180,180)
+    ax.set_ylim(-70,90)
+    lvls = np.linspace(0,800,17)
+    pl = sh.plot(column='sr',ax=ax,markersize=20, cmap=cm,
+               k=10,vmin=20,vmax=600,
+               legend=True,
+               legend_kwds={'label': "Sr(mm)", 'orientation': "horizontal", 'pad':0.02,'ticks':lvls})
+    ax.set_title(f'Sr catchments',size=20)
