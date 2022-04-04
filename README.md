@@ -28,7 +28,7 @@ The following input data is needed:
 - GSIM catchment yearly discharge timeseries (https://essd.copernicus.org/articles/10/787/2018/)
 - GSIM catchment shapes (shapefile) (https://essd.copernicus.org/articles/10/765/2018/)
 
-An example dataset can be downloaded from: https://surfdrive.surf.nl/files/index.php/s/LJIf99kABsHszdq
+An example dataset can be downloaded from: https://surfdrive.surf.nl/files/index.php/s/GiBTx1WYBDaoYmJ (data.zip)
 
 # Running
 The module consists of three run-scripts (jupyter notebooks) and five function scripts (.py)
