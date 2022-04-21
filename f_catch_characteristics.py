@@ -1,7 +1,13 @@
 """
+f_catch_characteristics
+------------------------
+calculate and organize catchment characteristics based on timeseries of Q P and Ep
 
-to do fransje -> add clear explanations per function
--> add more variables (ST-index, other EE products,....)
+TO DO -> add more variables (ST-index, other EE products,....)
+
+1. compute catchment characteristics (p_mean, ep_mean, t_mean, ai, si_p, si_ep, phi, q_mean)
+2. catch_characteristics
+3. geo_catchments
 
 
 """
@@ -14,23 +20,49 @@ from scipy.optimize import least_squares
 import geopandas as gpd
 
 
+## 1
 def p_mean(df):
+    """
+    calculate mean precipitation
+    df: pandas dataframe, P timeseries
+    returns: mean P [mm/day]
+    """
     m = df['P'].mean()
     return m
 
 def ep_mean(df):
+    """
+    calculate mean potential evaporation
+    df: pandas dataframe, Ep timeseries
+    returns: mean Ep [mm/day]
+    """
     m = df['Ep'].mean()
     return m
 
 def t_mean(df):
+    """
+    calculate mean temperature
+    df: pandas dataframe, T timeseries
+    returns: mean T [deg C]
+    """
     m = df['T'].mean()
     return m
 
 def ai(df):
+    """
+    calculate aridity index (P/Ep)
+    df: pandas dataframe, P and Ep timeseries
+    returns: aridity index AI [-]
+    """
     ai = df['P'].mean()/df['Ep'].mean()
     return ai
 
 def si_p(df):
+    """
+    calculate seasonality index of precipitation (see https://esd.copernicus.org/articles/12/725/2021/ for equation)
+    df: pandas dataframe, P timeseries
+    returns: seasonality index SI_P [-]
+    """
     p = df['P']
     for j in p.index:
         if(j.month==1 and j.day==1):
@@ -52,6 +84,11 @@ def si_p(df):
     return sip
     
 def si_ep(df):
+    """
+    calculate seasonality index of potential evaporation (see https://esd.copernicus.org/articles/12/725/2021/ for equation)
+    df: pandas dataframe, Ep timeseries
+    returns: seasonality index SI_Ep [-]
+    """
     ep = df['Ep']
     for j in ep.index:
         if(j.month==1 and j.day==1):
@@ -74,6 +111,11 @@ def si_ep(df):
     return siep
 
 def phi(df):
+    """
+    calculate phase lag (timing shift) between max Ep and max P 
+    df: pandas dataframe, P and Ep timeseries
+    returns: phase lag phi [months]
+    """
     p = df['P']
     ep = df['Ep']
     for j in p.index:
@@ -101,20 +143,39 @@ def phi(df):
     return phi
 
 def q_mean(df_q):
+    """
+    calculate mean discharge
+    df: pandas dataframe, Q timeseries
+    returns: mean Q [mm/day]
+    """
     m = df_q['Q'].mean()
     return m
 
-
+## 2 
 def catch_characteristics(var, catch_id_list, fol_in, fol_out):
+    """
+    calculate catchment characteristics and store in dataframe
+    var:             str, list, list of variables (options: p_mean, q_mean, ep_mean, t_mean, ai, si_p, si_ep, phi, tc)
+    catch_id_list:   str, list, list of catchment ids
+    fol_in:          str, dir, directory with timeseries data
+    fol_out:         str, dir, directory where to store the output tables
+    
+    returns: table (cc) with catchment characteristics for all catchments       
+    """
+    # make cc dataframe
     cc = pd.DataFrame(index=catch_id_list, columns=var)
+    
+    # loop over catchment ids
     for j in catch_id_list:
-        l = glob.glob(f'{fol_in}/forcing_timeseries/processed/daily/{j}*.csv')
+        l = glob.glob(f'{fol_in}/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
         df = pd.read_csv(l[0], index_col=0)
         df.index = pd.to_datetime(df.index)
-        l_q = glob.glob(f'{fol_in}/discharge/timeseries/{j}*.csv')
+        
+        l_q = glob.glob(f'{fol_in}/discharge/timeseries/{j}*.csv') # find discharge data for catchment
         df_q = pd.read_csv(l_q[0], index_col=0)
         df_q.index = pd.to_datetime(df_q.index)
 
+        # calculate catchment characteristics using functions in (1)
         if 'p_mean' in var:
             cc.loc[j,'p_mean'] = p_mean(df)
         
@@ -139,25 +200,36 @@ def catch_characteristics(var, catch_id_list, fol_in, fol_out):
         if 'phi' in var:
             cc.loc[j,'phi'] = phi(df)
         
-        # treecover
+        # get tree cover statistics 
         if 'tc' in var:
-            l = glob.glob(f'{fol_in}/earth_engine_timeseries/treecover/{j}*.csv')
+            l = glob.glob(f'{fol_in}/earth_engine_timeseries/treecover/{j}*.csv') #find treecover tables for catchment
             dft = pd.read_csv(l[0], index_col=0)
             cc.loc[j,'tc'] = dft.loc[j,'mean_tc']
             cc.loc[j,'ntc'] = dft.loc[j,'mean_ntc']
             cc.loc[j,'nonveg'] = dft.loc[j,'mean_nonveg']
             
-    cc.to_csv(f'{fol_out}/catchment_characteristics.csv')
+    cc.to_csv(f'{fol_out}/catchment_characteristics.csv') #store cc dataframe
     return cc
 
+## 3
 def geo_catchments(shape_dir,out_dir):
+    """
+    merge all catchment shapefiles into one
+    
+    shape_dir:   str, dir, directory with shapefiles
+    out_dir:     out, dir, output directory for merged shapefile
+    
+    Stores merged shapefile as .shp
+    
+    """
+    # list al shapefiles    
     shapefiles = glob.glob(f"{shape_dir}/*shp")
-    li=[]
+    li=[] #empty list
     for filename in shapefiles:
-        df = gpd.read_file(filename, index_col=None, header=0)
-        li.append(df)
-    f = pd.concat(li, axis=0)
+        df = gpd.read_file(filename, index_col=None, header=0) #read shapefile as geopandas dataframe
+        li.append(df) #append shapefile to list
+    f = pd.concat(li, axis=0) #concatenate lists
     f = f.rename(columns={'FILENAME':'catch_id'})
     f.index = f['catch_id']
     f = f.drop(columns={'catch_id','Id'})
-    f.to_file(f'{out_dir}/geo_catchments.shp')
+    f.to_file(f'{out_dir}/geo_catchments.shp') #store geopandas dataframe as .shp
