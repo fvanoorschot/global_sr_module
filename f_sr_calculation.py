@@ -6,9 +6,10 @@ functions to calculate catchment sr using the memory method
 1. sd_initial
 2. sr_return_periods_minmax_rzyear
 3. run_sd_calculation
-4. run_sr_calculation
-5. merge_sr_catchments
-6. plot_sr 
+4. plot_sd
+5. run_sr_calculation
+6. merge_sr_catchments
+7. plot_sr 
 
 """
 
@@ -129,7 +130,7 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
     q_dir:       str, dir, directory of Q timeseries
     out_dir:     str, dir, output directory
     
-    returns: None, stores out dataframe (Sd calculation) as csv
+    returns: out:sd timeseries, stores out dataframe (Sd calculation) as csv
     """
     
     # get P Ep and Q files for catch id
@@ -158,30 +159,59 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
     q_start_year = int(q_ts.index[0].year)
     p_ep_end_year = pep_ts.index.year[-1]
     q_end_year = int(q_ts.index[-1].year)
-    start_year = max(q_start_year,p_ep_start_year)
-    end_year = min(q_end_year,p_ep_end_year)
-    start_date = datetime(start_year,hydro_year_start_month,1)
-    end_date = datetime(end_year,hydro_year_start_month,1)
-    end_date = end_date - timedelta(days=1)
 
-    #calculate mean Q for startdate enddate timeseries
-    q_mean = q_ts.loc[start_date:end_date,'Q'].mean()
+    # test if timeseries have overlap -> if not don't continue the sd calculation
+    if q_start_year>p_ep_end_year:
+        a=1
+    elif p_ep_start_year>q_end_year:
+        a=1
+    else:
+        a=0
+        start_year = max(q_start_year,p_ep_start_year)
+        end_year = min(q_end_year,p_ep_end_year)
+        start_date = datetime(start_year,hydro_year_start_month,1)
+        end_date = datetime(end_year,hydro_year_start_month,1)
+        end_date = end_date - timedelta(days=1)
 
-    # prepare input dataframe for sd calculation
-    sd_input = pd.DataFrame(index=pd.date_range(start_date,end_date,freq='d'), columns=['P','Ep','date_start','date_end'])
-    sd_input[['P','Ep']] = pep_ts[['P','Ep']]
-    sd_input[['date_start','date_end']] = start_date, end_date
-    si_0 = 0 #initial interception storage
-    si_max = 2.5 #maximum interception storage
-    
-    # run sd calculation
-    b = sd_initial(sd_input, si_0, si_max, q_mean)[0] #b==0: closing wb, b==1: non-closing wb > no sd calculation
-    if b==0:      
-        # save output dataframe from sd calculation
-        out = sd_initial(sd_input, si_0, si_max, q_mean)[1]
-        out.to_csv(f'{out_dir}/{catch_id}.csv')
-        
+        #calculate mean Q for startdate enddate timeseries
+        q_mean = q_ts.loc[start_date:end_date,'Q'].mean()
+
+        # prepare input dataframe for sd calculation
+        sd_input = pd.DataFrame(index=pd.date_range(start_date,end_date,freq='d'), columns=['P','Ep','date_start','date_end'])
+        sd_input[['P','Ep']] = pep_ts[['P','Ep']]
+        sd_input[['date_start','date_end']] = start_date, end_date
+        si_0 = 0 #initial interception storage
+        si_max = 2.5 #maximum interception storage
+
+        # run sd calculation
+        b = sd_initial(sd_input, si_0, si_max, q_mean)[0] #b==0: closing wb, b==1: non-closing wb > no sd calculation
+        if b==0:      
+            # save output dataframe from sd calculation
+            out = sd_initial(sd_input, si_0, si_max, q_mean)[1]
+            out.to_csv(f'{out_dir}/{catch_id}.csv')
+            
+            return out
 ## 3
+def plot_sd(catch_id, sd_dir):
+    """
+    plot timeseries of storage deficits for catchment catch id
+    catch_id:   str, catchment id
+    sd_dir:     str, dir, directory where you find the sd table from (2)
+    
+    returns:    None, shows figure of sd
+    """
+    df = pd.read_csv(f'{sd_dir}/{catch_id}.csv',index_col=0)
+    df.index = pd.to_datetime(df.index)
+    
+    fig = plt.figure(figsize=(6,3))
+    ax = fig.add_subplot(111)
+    ax.plot(df.index, df.Sd*-1)
+    ax.set_ylim(300,0)
+    ax.set_ylabel('storage deficit (mm)')
+    ax.set_title(f'catchment {catch_id}')
+            
+            
+## 4
 def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,date_end):
     """
     calculate sr for different return periods - min max root zone year approach from Stijn??
@@ -266,7 +296,7 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
     return(Sd_T)   
 
        
-#4
+## 5
 def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir):
     """
     run sr calculation
@@ -295,7 +325,7 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir):
         if(date_end=='2-29'):
             date_end='2-28'
         
-        # calculate sr for different return periods using (3)
+        # calculate sr for different return periods using (4)
         sr_T = sr_return_periods_minmax_rzyear(rp_array, Sd, year_start, year_end, date_start, date_end)
         
         # store dataframe with catchment sr values
@@ -305,7 +335,7 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir):
         
         return(sr_df)
 
-# 5
+## 6
 def merge_sr_catchments(sr_dir,out_dir):
     """
     merge sr from individual catchments into one dataframe
@@ -313,7 +343,7 @@ def merge_sr_catchments(sr_dir,out_dir):
     sr_dir:   str, dir, directory with sr csvs for all catchments
     out_dir:  str, dir, output directory for table
     
-    returns: None, stores csv with sr of all catchments
+    returns: df with sr of all catchments, stores csv with sr of all catchments
     
     """
     # get all sr files
@@ -334,13 +364,15 @@ def merge_sr_catchments(sr_dir,out_dir):
     frame = frame.drop(columns={'catch_id'})
     frame.to_csv(f'{out_dir}/sr_all_catchments.csv')
     
-# 6
+    return frame
+    
+## 7
 def plot_sr(shp_file, sr_file, rp):
     """
     plot sr estimates in map
     
     shp_file:   str, file, shapefile of catchments
-    sr_file:    str, file, csv file from (5) with catchment sr values
+    sr_file:    str, file, csv file from (6) with catchment sr values
     rp:         int, value for return period
     
     returns: None, creates map of sr estimates
