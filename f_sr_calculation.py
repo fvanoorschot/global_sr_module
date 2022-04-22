@@ -1,4 +1,17 @@
-#%% LOAD PACKAGES
+"""
+f_sr_calculation
+-----------------
+functions to calculate catchment sr using the memory method
+
+1. sd_initial
+2. sr_return_periods_minmax_rzyear
+3. run_sd_calculation
+4. run_sr_calculation
+5. merge_sr_catchments
+6. plot_sr 
+
+"""
+
 import glob
 from pathlib import Path
 import os
@@ -12,121 +25,188 @@ import matplotlib.pyplot as plt
 import cartopy
 
 
-#%% SR CALCULATION
-# INPUT
-# sd_input: dataframe with daily catchment values for P, Ep, Q
-# Si_0: initial interception storage = 0
-# Si_max: maximum interception storage = 2.5mm
-# date_start, date_end: start and end 'month-day' of time-series (depending on hydro-year)
-# year_start, year_end: start and end year of time-series
+## 1
+def sd_initial(df, si_0, si_max, q_mean):
+    """
+    calculate timeseries of storage deficits
 
-# OUTPUT
-# catchment: pandas dataframe with daily catchment values for P, Ep, Q, Pe, Et and Sd (based on initial Et estimate)
+    df:       pandas dataframe, daily values for P, and Ep and date_start and date_end (defined in (2))
+    si_0:     int, initial interception storage = 0
+    si_max:   int, maximum interception storage = 2.5 mm
+    q_mean:   df, catchment mean discharge
 
-# SD
-def sd_initial(sd_input, Si_0, Si_max, q_mean):
-
-    #read csv file for catchment of interest
-    # catchment = pd.read_csv(filename, sep=',', skiprows=0, index_col=0, skipinitialspace=True)
-    # catchment.index = pd.to_datetime(catchment.index)
-    sd_input = sd_input.loc[sd_input.date_start[0]:sd_input.date_end[0]]
+    returns: 
+    b:        int, 1>non closing water balance, 0>closing water balance
+    df:       pandas dataframe, daily values for P, Pe, Ep, Ei, Et, Sd
+    """
     
-    # soms is de start date eg 02-01 maar begint de timeseries pas 02-28: dan een jaar erbij optellen
-    if sd_input.index[0]>sd_input.date_start[0]:
-        sd_input.date_start = sd_input.date_start[0] + relativedelta(years=1)
+    # add year if the start date is earlier than the timeseries (e.g. startdate 02-01, timeseries starts 02-28) 
+    if df.index[0]>df.date_start[0]:
+        df.date_start = df.date_start[0] + relativedelta(years=1)
     
-    sd_input = sd_input.loc[sd_input.date_start[0]:sd_input.date_end[0]]
+    # select time period of interest
+    df = df.loc[df.date_start[0]:df.date_end[0]]
     
-    # add columns for interception storage calculation
-    sd_input['Si_1'] = np.nan
-    sd_input['Pe'] = np.nan
-    sd_input['Si_2'] = np.nan
-    sd_input['Ei'] = np.nan
-    sd_input['Si_3'] = np.nan
-    sd_input['Et'] = np.nan
-    sd_input['Sd'] = np.nan
+    # add empty columns for interception storage calculation
+    df.loc[:,'Si_1'] = np.nan
+    df.loc[:,'Pe'] = np.nan
+    df.loc[:,'Si_2'] = np.nan
+    df.loc[:,'Ei'] = np.nan
+    df.loc[:,'Si_3'] = np.nan
+    df.loc[:,'Et'] = np.nan
+    df.loc[:,'Sd'] = np.nan
     
-    # convert to numpy arrays
-    p = np.array(sd_input.P.values)
-    # q = np.array(sd_input.Q.values)
-    ep = np.array(sd_input.Ep.values)
+    # convert to numpy arrays (to speed up calculations)
+    p = np.array(df.P.values)
+    ep = np.array(df.Ep.values)
     
-    si1 = np.zeros(len(sd_input))
-    pe = np.zeros(len(sd_input))
-    si2 = np.zeros(len(sd_input))
-    ei = np.zeros(len(sd_input))
-    si3 = np.zeros(len(sd_input))
-    et = np.zeros(len(sd_input))
-    sd = np.zeros(len(sd_input))
+    si1 = np.zeros(len(df))
+    pe = np.zeros(len(df))
+    si2 = np.zeros(len(df))
+    ei = np.zeros(len(df))
+    si3 = np.zeros(len(df))
+    et = np.zeros(len(df))
+    sd = np.zeros(len(df))
     
     #calculate interception storage and effective precipitation for all timesteps
     for l in range(1,len(si1)):
-        si1[0] = p[0] + Si_0
-        pe[0] = max(0,si1[0]-Si_max)
+        # first timestep l=0
+        si1[0] = p[0] + si_0
+        pe[0] = max(0,si1[0]-si_max)
         si2[0] = si1[0] - pe[0]
         ei[0] = min(si2[0],ep[0])
         si3[0] = si2[0] - ei[0]
     
+        # timestep 1 to end
         si1[l] = p[l] + si3[l-1]
-        pe[l] = max(0,si1[l]-Si_max)
+        pe[l] = max(0,si1[l]-si_max)
         si2[l] = si1[l] - pe[l]
         ei[l] = min(si2[l],ep[l])
         si3[l] = si2[l] - ei[l]
     
-    #water balance Et calculation (Et = Pe-Q)
+    #calculate Et from the catchment water balance (Et = Pe-Q)
     Pe_mean = np.mean(pe)
     EP_mean = np.mean(ep)
-    Q_mean = q_mean
+    Q_mean = q_mean #q_mean from other file than p and e because yearly timeseries
     Et_mean = Pe_mean - Q_mean
     
-    if Et_mean<0: 
-        b = 1
+    #check if water balance is ok
+    if Et_mean<0: # if this is the case, it is not possible to calculate sd
+        b = 1 # wb not ok
     else:
-        b = 0
+        b = 0 # wb ok
         #calculate daily Et (EP(daily)*(Et_sum/EP_sum)) and Sd
-        for l in range(1,np.size(sd_input.index)):
-            #if Pe < Q -> kan niet!            
+        for l in range(1,np.size(df.index)):
+            # sd for timestep 0
             et[0] = ep[0]/EP_mean * Et_mean
             sd[0] = min(0,pe[0] - et[0])
 
+            # sd for timestep 1 - end
             et[l] = ep[l]/EP_mean * Et_mean
             sd[l] = min(0,sd[l-1]+pe[l]-et[l])
 
-        sd_input.Si_1 = si1
-        sd_input.Si_2 = si2
-        sd_input.Si_3 = si3
-        sd_input.Pe = pe
-        sd_input.Ei = ei
-        sd_input.Sd = sd
-        sd_input.Et = et
+        # add numpy arrays to dataframe
+        df.Si_1 = si1
+        df.Si_2 = si2
+        df.Si_3 = si3
+        df.Pe = pe
+        df.Ei = ei
+        df.Sd = sd
+        df.Et = et
     
-    # if(sd_input.Sd.mean()==0):
-    #     sd_input.Sd=np.nan
+    # if(df.Sd.mean()==0):
+    #     df.Sd=np.nan
     
-    return b, sd_input
+    return b, df
 
-
-#%% function 2: Sr calculation based on return periods - INCLUDE MIN MAX APPROACH LIKE STIJN
-
-# INPUT
-# T: array of return periods of interest T=[2,5,10,15,20,30,40]
-# Sd: dataframe of Sd calculated in sd_iterations function
-# date_start, date_end: start and end 'month-day' of time-series (depending on hydro-year)
-# year_start, year_end: start and end year of time-series
-# it: amount of iterations
+## 2
+def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
+    """
+    run calculation of storage deficits (1)
     
-# OUTPUT
-# Sd_T: storage deficits corresponding with return periods T
+    catch_id:    str, catchment id
+    pep_dir:     str, dir, directory of P and Ep timeseries
+    q_dir:       str, dir, directory of Q timeseries
+    out_dir:     str, dir, output directory
     
+    returns: None, stores out dataframe (Sd calculation) as csv
+    """
+    
+    # get P Ep and Q files for catch id
+    f_pep = glob.glob(f'{pep_dir}/{catch_id}*.csv')
+    f_q = glob.glob(f'{q_dir}/{catch_id}*.csv')
 
-def sr_return_periods_minmax_rzyear(RP,Sd,year_start,year_end,date_start,date_end):
+    # read files as dataframes
+    q_ts = pd.read_csv(f_q[0],index_col=0)
+    q_ts.index = pd.to_datetime(q_ts.index)
+    pep_ts = pd.read_csv(f_pep[0],index_col=0)
+    pep_ts.index = pd.to_datetime(pep_ts.index)
 
-    # for j in range(len(RP)):
+    # convert to monthly dataframes
+    df_monthly = pd.DataFrame(index=pd.date_range(pep_ts.index[0],pep_ts.index[-1],freq='M'), columns=['P','Ep'])
+    df_monthly[['P','Ep']] = pep_ts[['P','Ep']].groupby(pd.Grouper(freq="M")).sum()
+
+    # calculate start hydroyear -> month after on average the wettest month
+    df_monthly_mean = df_monthly.groupby([df_monthly.index.month]).mean()
+    wettest_month = (df_monthly_mean['P']-df_monthly_mean['Ep']).idxmax()
+    hydro_year_start_month = wettest_month+1
+    if hydro_year_start_month==13:
+        hydro_year_start_month=1
+
+    # find the start and end date for the sr calculation based on P, Ep, Q timeseries and hydroyear
+    p_ep_start_year = pep_ts.index.year[0]
+    q_start_year = int(q_ts.index[0].year)
+    p_ep_end_year = pep_ts.index.year[-1]
+    q_end_year = int(q_ts.index[-1].year)
+    start_year = max(q_start_year,p_ep_start_year)
+    end_year = min(q_end_year,p_ep_end_year)
+    start_date = datetime(start_year,hydro_year_start_month,1)
+    end_date = datetime(end_year,hydro_year_start_month,1)
+    end_date = end_date - timedelta(days=1)
+
+    #calculate mean Q for startdate enddate timeseries
+    q_mean = q_ts.loc[start_date:end_date,'Q'].mean()
+
+    # prepare input dataframe for sd calculation
+    sd_input = pd.DataFrame(index=pd.date_range(start_date,end_date,freq='d'), columns=['P','Ep','date_start','date_end'])
+    sd_input[['P','Ep']] = pep_ts[['P','Ep']]
+    sd_input[['date_start','date_end']] = start_date, end_date
+    si_0 = 0 #initial interception storage
+    si_max = 2.5 #maximum interception storage
+    
+    # run sd calculation
+    b = sd_initial(sd_input, si_0, si_max, q_mean)[0] #b==0: closing wb, b==1: non-closing wb > no sd calculation
+    if b==0:      
+        # save output dataframe from sd calculation
+        out = sd_initial(sd_input, si_0, si_max, q_mean)[1]
+        out.to_csv(f'{out_dir}/{catch_id}.csv')
+        
+## 3
+def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,date_end):
+    """
+    calculate sr for different return periods - min max root zone year approach from Stijn??
+    
+    rp_array:   int, array, list of return periods
+    sd:         pandas df, storage deficits
+    year_start: str, start year
+    year_end:   str, end year
+    date_start: str, month-day start
+    date_end:   str, month-day end
+    
+    returns:
+    Sd_T:       list of storage deficit for return periods in rp_array
+    
+    """
+
+    # inverse of sd
     Sd = Sd*-1
+    
+    # count years
     total_years = year_end - year_start
     years = range(year_start,year_end+1,1)
 
     # calculate annual max Sd - without iterations for hydro years
+    # CHECK THIS PROCEDURE AGAIN FRANSJE
     Sd_max=[]
     Sd_maxmin = []
     for i in range(0,total_years,1):
@@ -162,112 +242,127 @@ def sr_return_periods_minmax_rzyear(RP,Sd,year_start,year_end,date_start,date_en
             
     # gumbel function
     def gumbel_r_mom(x):
+        """
+        gumbel extreme value analysis
+        x:        list of max sd values per year
+        returns:  loc and scale of gumbel distribution
+        
+        """
         scale = np.sqrt(6)/np.pi * np.std(x)
         loc = np.mean(x) - np.euler_gamma*scale
         return loc, scale    
 
+    # calculate gumbel parameters
     loc1, scale1 = gumbel_r_mom(Sd_maxmin_rz_year)
 
     # find Sd value corresponding with return period
     Sd_T = []
-    for i in np.arange(0,len(RP),1):
-        p = 1-(1/RP[i])
+    for i in np.arange(0,len(rp_array),1):
+        p = 1-(1/rp_array[i])
         y = -np.log(-np.log(p))
         x = scale1 * y + loc1
         Sd_T.append(x)
          
     return(Sd_T)   
 
-
-
-def run_sd_calculation(catch_id, pep_dir,q_dir,out_dir,Si_max):
+       
+#4
+def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir):
+    """
+    run sr calculation
     
-    f_pep = glob.glob(f'{pep_dir}/{catch_id}*.csv')
-    f_q = glob.glob(f'{q_dir}/{catch_id}*.csv')
-
-    q_ts = pd.read_csv(f_q[0],index_col=0)
-    q_ts.index = pd.to_datetime(q_ts.index)
-    pep_ts = pd.read_csv(f_pep[0],index_col=0)
-    pep_ts.index = pd.to_datetime(pep_ts.index)
-
-    df_monthly = pd.DataFrame(index=pd.date_range(pep_ts.index[0],pep_ts.index[-1],freq='M'), columns=['P','Ep'])
-    df_monthly[['P','Ep']] = pep_ts[['P','Ep']].groupby(pd.Grouper(freq="M")).sum()
-
-    # calculate start hydroyear
-    df_monthly_mean = df_monthly.groupby([df_monthly.index.month]).mean()
-    wettest_month = (df_monthly_mean['P']-df_monthly_mean['Ep']).idxmax()
-    hydro_year_start_month = wettest_month+1
-    if hydro_year_start_month==13:
-        hydro_year_start_month=1
-
-    p_ep_start_year = pep_ts.index.year[0]
-    q_start_year = int(q_ts.index[0].year)
-    p_ep_end_year = pep_ts.index.year[-1]
-    q_end_year = int(q_ts.index[-1].year)
-    start_year = max(q_start_year,p_ep_start_year)
-    end_year = min(q_end_year,p_ep_end_year)
-    start_date = datetime(start_year,hydro_year_start_month,1)
-    end_date = datetime(end_year,hydro_year_start_month,1)
-    end_date = end_date - timedelta(days=1)
-
-    # qmean
-    q_mean = q_ts.loc[start_date:end_date,'Q'].mean()
-
-    # p ep data
-    sd_input = pd.DataFrame(index=pd.date_range(start_date,end_date,freq='d'), columns=['P','Ep','date_start','date_end'])
-    sd_input[['P','Ep']] = pep_ts[['P','Ep']]
-    sd_input[['date_start','date_end']] = start_date, end_date
-    Si_0 = 0
-    Si_max = 2.5
-    b = sd_initial(sd_input, Si_0, Si_max, q_mean)[0]
-    if b==0:      
-        out = sd_initial(sd_input, Si_0, Si_max, q_mean)[1]
-        out.to_csv(f'{out_dir}/{catch_id}.csv')
-        
-        
-
-def run_sr_calculation(catch_id,RP,sd_dir,out_dir):
+    catch_id:   str, catchment id
+    rp_array:   int, array, array of return periods
+    sd_dir:     str, dir, directory with sd dataframes
+    out_dir:    str, dir, output directory
+    
+    returns:    sr_df, dataframe with sr for catchment, stored as csv
+    
+    """
+    # check if sd exists for catchment id
     if(os.path.exists(f'{sd_dir}/{catch_id}.csv')==True):  
-        out = pd.read_csv(f'{sd_dir}/{catch_id}.csv',index_col=0)
-        out.index = pd.to_datetime(out.index)
-        # run SR calculation based on intial Sd calculation (without iterations)
-        Sd = out.Sd
-        year_start = out.index[0].year
-        year_end = out.index[-1].year
-        date_start = str(out.index[0].month)+'-'+str(out.index[0].day)
-        date_end = str(out.index[-1].month)+'-'+str(out.index[-1].day)
+        
+        # read storage deficit table
+        sd_table = pd.read_csv(f'{sd_dir}/{catch_id}.csv',index_col=0)
+        sd_table.index = pd.to_datetime(sd_table.index)
+        
+        # get sd, start and end year and date from sd_table
+        Sd = sd_table.Sd
+        year_start = sd_table.index[0].year
+        year_end = sd_table.index[-1].year
+        date_start = str(sd_table.index[0].month)+'-'+str(sd_table.index[0].day)
+        date_end = str(sd_table.index[-1].month)+'-'+str(sd_table.index[-1].day)
         if(date_end=='2-29'):
             date_end='2-28'
-        sr_T = sr_return_periods_minmax_rzyear(RP,Sd,year_start,year_end,date_start,date_end)
-        sr_df = pd.DataFrame(index=[catch_id], columns=RP)
+        
+        # calculate sr for different return periods using (3)
+        sr_T = sr_return_periods_minmax_rzyear(rp_array, Sd, year_start, year_end, date_start, date_end)
+        
+        # store dataframe with catchment sr values
+        sr_df = pd.DataFrame(index=[catch_id], columns=rp_array)
         sr_df.loc[catch_id]=sr_T
         sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
+        
         return(sr_df)
-    
+
+# 5
 def merge_sr_catchments(sr_dir,out_dir):
+    """
+    merge sr from individual catchments into one dataframe
+    
+    sr_dir:   str, dir, directory with sr csvs for all catchments
+    out_dir:  str, dir, output directory for table
+    
+    returns: None, stores csv with sr of all catchments
+    
+    """
+    # get all sr files
     all_files = glob.glob(f'{sr_dir}/*.csv')
+    
+    # make empty list
     li = []
 
+    # loop over sr files
     for filename in all_files:
         df = pd.read_csv(filename, index_col=None, header=0)
         li.append(df)
+    
+    # merge files and store as csv
     frame = pd.concat(li, axis=0)
     frame = frame.rename(columns={'Unnamed: 0':'catch_id'})
     frame.index = frame['catch_id']
     frame = frame.drop(columns={'catch_id'})
     frame.to_csv(f'{out_dir}/sr_all_catchments.csv')
     
-def plot_sr(shp_file,sr_file):
+# 6
+def plot_sr(shp_file, sr_file, rp):
+    """
+    plot sr estimates in map
+    
+    shp_file:   str, file, shapefile of catchments
+    sr_file:    str, file, csv file from (5) with catchment sr values
+    rp:         int, value for return period
+    
+    returns: None, creates map of sr estimates
+    
+    """
+    # read sr file
     df = pd.read_csv(sr_file,index_col=0)
     
+    # read shapefile
     sh = gpd.read_file(shp_file,index_col=0)
     sh.index = sh.catch_id
     sh = sh.drop(columns=['catch_id'])
-    sh['sr'] = df['20']
+    
+    # add sr values to geodataframe with shapes
+    sh['sr'] = df[str(rp)]
+    
+    # get catchment centroid instead of shape as geometry -> ignore warning about CRS
     sh['centroid'] = sh.centroid
     sh = sh.drop(columns='geometry')
     sh = sh.rename(columns={'centroid':'geometry'})
 
+    # make plot
     fig = plt.figure(figsize=(12,12))
     cm = plt.cm.get_cmap('jet')
     ax = plt.axes(projection=cartopy.crs.PlateCarree())
@@ -275,8 +370,9 @@ def plot_sr(shp_file,sr_file):
     ax.set_xlim(-180,180)
     ax.set_ylim(-70,90)
     lvls = np.linspace(0,800,17)
+    # plot centroid points, color based on Sr value
     pl = sh.plot(column='sr',ax=ax,markersize=20, cmap=cm,
                k=10,vmin=20,vmax=600,
                legend=True,
                legend_kwds={'label': "Sr(mm)", 'orientation': "horizontal", 'pad':0.02,'ticks':lvls})
-    ax.set_title(f'Sr catchments',size=20)
+    ax.set_title(f'Sr catchments, RP={rp}',size=20)

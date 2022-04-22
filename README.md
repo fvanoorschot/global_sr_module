@@ -44,6 +44,7 @@ The module consists of three run-scripts (jupyter notebooks) and five function s
 3. *f_earth_engine* -> extract catchment average values from satellite products using Google Earth Engine
 4. *f_sr_calculation* -> calculate catchment root zone storage capacity based on catchment water balances
 5. *f_catch_characteristics* -> calculate catchment climate and landscape characteristics and store in table
+6. *f_regression* -> linear regression model to predict sr based on descriptor parameters
 
 # Examples
 *add this*
