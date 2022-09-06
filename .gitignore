@@ -1,0 +1,9 @@
+.vscode/
+
+# ipynb
+.ipynb_checkpoints/
+
+# ignore binaries
+example.egg-info
+.env/
+.venv/
