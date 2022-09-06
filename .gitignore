@@ -7,3 +7,6 @@
 example.egg-info
 .env/
 .venv/
+
+# ignore environment file
+.env
