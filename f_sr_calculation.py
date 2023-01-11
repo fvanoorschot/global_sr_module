@@ -1,6 +1,5 @@
 """
 f_sr_calculation
-test test
 -----------------
 functions to calculate catchment sr using the memory method
 
