@@ -33,13 +33,13 @@ dependencies:
   - bzip2=1.0.8=h7f98852_4
   - c-ares=1.18.1=h7f98852_0
   - c-blosc2=2.0.4=h5f21a17_1
-  - ca-certificates=2021.10.8=ha878542_0
+  - ca-certificates=2022.6.15=ha878542_0
   - cachetools=4.2.4=pyhd8ed1ab_0
   - cairo=1.16.0=ha00ac49_1009
   - cartopy=0.20.1=py39h8394fad_5
   - cdo=2.0.0=h34154eb_0
   - cdsapi=0.5.1=pyhd8ed1ab_0
-  - certifi=2021.10.8=py39hf3d152e_2
+  - certifi=2022.6.15=pyhd8ed1ab_1
   - cf-units=3.0.1=py39hce5d2b2_1
   - cf_xarray=0.6.2=pyhd8ed1ab_0
   - cffi=1.15.0=py39h4bc2ebd_0
@@ -67,7 +67,7 @@ dependencies:
   - defusedxml=0.7.1=pyhd8ed1ab_0
   - dill=0.3.4=pyhd8ed1ab_0
   - distributed=2021.12.0=py39hf3d152e_0
-  - earthengine-api=0.1.307=pyhd8ed1ab_0
+  - earthengine-api=0.1.321=pyhd8ed1ab_0
   - eccodes=2.24.0=h11d1a29_0
   - ecmwf-api-client=1.6.1=pyhd3deb0d_0
   - entrypoints=0.3=pyhd8ed1ab_1003
@@ -106,6 +106,8 @@ dependencies:
   - geotiff=1.7.0=h90a4e78_5
   - gettext=0.19.8.1=h73d1719_1008
   - giflib=5.2.1=h36c2ea0_2
+  - gitdb=4.0.9=pyhd8ed1ab_0
+  - gitpython=3.1.27=pyhd8ed1ab_0
   - gnupg=2.3.3=h7853c96_0
   - google-api-core=1.31.5=pyhd8ed1ab_0
   - google-api-python-client=1.12.8=pyhd3deb0d_0
@@ -150,10 +152,12 @@ dependencies:
   - json-c=0.15=h98cffda_0
   - json5=0.9.5=pyh9f0ad1d_0
   - jsonschema=4.2.1=pyhd8ed1ab_1
+  - jupyter-server-mathjax=0.2.6=pyhc268e32_0
   - jupyter_client=7.1.0=pyhd8ed1ab_0
   - jupyter_core=4.9.1=py39hf3d152e_1
   - jupyter_server=1.13.1=pyhd8ed1ab_0
   - jupyterlab=3.2.5=pyhd8ed1ab_0
+  - jupyterlab-git=0.39.1=pyhd8ed1ab_0
   - jupyterlab_pygments=0.1.2=pyh9f0ad1d_0
   - jupyterlab_server=2.9.0=pyhd8ed1ab_0
   - jxrlib=1.1=h7f98852_2
@@ -249,6 +253,7 @@ dependencies:
   - nbclassic=0.3.4=pyhd8ed1ab_0
   - nbclient=0.5.9=pyhd8ed1ab_0
   - nbconvert=6.3.0=py39hf3d152e_1
+  - nbdime=3.1.1=pyhd8ed1ab_0
   - nbformat=5.1.3=pyhd8ed1ab_0
   - nc-time-axis=1.4.0=pyhd8ed1ab_0
   - ncurses=6.2=h58526e2_4
@@ -266,7 +271,7 @@ dependencies:
   - olefile=0.46=pyh9f0ad1d_1
   - openjpeg=2.4.0=hb52868f_1
   - openpyxl=3.0.9=pyhd8ed1ab_0
-  - openssl=1.1.1n=h166bdaf_0
+  - openssl=1.1.1l=h7f98852_0
   - ossuuid=1.6.2=hf484d3e_1000
   - packaging=21.3=pyhd8ed1ab_0
   - pandas=1.3.5=py39hde0f152_0
@@ -343,6 +348,7 @@ dependencies:
   - shapely=1.8.0=py39h98e2149_4
   - simplejson=3.17.6=py39h3811e60_0
   - six=1.16.0=pyh6c4a22f_0
+  - smmap=3.0.5=pyh44b312d_0
   - snappy=1.1.8=he1b5a44_3
   - sniffio=1.2.0=py39hf3d152e_2
   - snuggs=1.4.7=py_0
@@ -409,4 +415,4 @@ dependencies:
   - zipp=3.6.0=pyhd8ed1ab_0
   - zlib=1.2.11=h36c2ea0_1013
   - zstd=1.5.0=ha95c52a_0
-prefix: /home/fransjevanoors/miniconda3/envs/sr_env
+prefix: /home/vanoorschot/miniconda3/envs/sr_env
