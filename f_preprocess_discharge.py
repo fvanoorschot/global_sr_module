@@ -112,4 +112,34 @@ def preprocess_gsim_discharge(catch_id, fol_in, fol_out):
     
     return c, a_mm
     
-    
+def run_function_parallel(
+    catch_list=list,
+    fol_in_list=list,
+    fol_out_list=list,
+    # threads=None
+    threads=100
+):
+    """
+    Runs function preprocess_gsim_discharge  in parallel.
+
+    catch_list:  str, list, list of catchmet ids
+    fol_in_list:     str, list, list of input folders
+    fol_out_list:   str, list, list of output folders
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        preprocess_gsim_discharge,
+        catch_list,
+        fol_in_list,
+        fol_out_list,
+    )
+
+    # return results
