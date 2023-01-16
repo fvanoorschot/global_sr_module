@@ -33,10 +33,28 @@ The columns in the data have the following meaning (see table 3 and 4 paper Gudm
 """
 
 
-import numpy as np
-import pandas as pd
+# import packages
 import glob
-
+from pathlib import Path
+import os
+import numpy as np
+from datetime import datetime
+from datetime import timedelta
+import pandas as pd
+import calendar
+import geopandas as gpd
+import cartopy
+import matplotlib.pyplot as plt
+import math
+from pathos.threading import ThreadPool as Pool
+from scipy.optimize import least_squares
+import sklearn
+from sklearn.linear_model import LinearRegression
+from scipy.stats import gaussian_kde
+import statsmodels.api as sm
+from statsmodels.regression.linear_model import OLS
+from statsmodels.tools import add_constant
+import random
 
 def preprocess_gsim_discharge(catch_id, fol_in, fol_out):
 
@@ -142,4 +160,71 @@ def run_function_parallel(
         fol_out_list,
     )
 
-    # return results
+    
+def select_catchments(data_dir,out_dir,catch_id):
+    # load df with all catchments with characteristics
+    df = pd.read_csv(f'{data_dir}/GSIM_data/GSIM_metadata/GSIM_catalog/GSIM_catchment_characteristics.csv',index_col=0) 
+    
+    # load catchment characteristic file
+    a = pd.read_csv(f'{out_dir}/gsim/characteristics/{catch_id}.csv',index_col=0)
+    a['start_year'] = pd.to_datetime(a['start_year'])
+    a['end_year'] = pd.to_datetime(a['end_year'])
+    k = a['gsim.no'][0]   
+
+    # check if end year later than 1980
+    t_1980 = a['end_year'][0]< datetime(year=1980,month=1,day=1)
+
+    # check timeseries
+    b = pd.read_csv(f'{out_dir}/gsim/timeseries/{catch_id}.csv',index_col=0)
+
+    # later than 1980
+    b = b.loc['1980-12-31':]
+
+    # set to nan if nr available days <250
+    b.Q[b['nr_av_days']<250] = np.nan
+
+    # drop nan years
+    b = b.dropna(axis=0)
+
+    # check length of timeseries
+    len_b = len(b)
+
+    # >10 years data
+    t_length = len_b>10
+
+    # area quality
+    a_qual = (df.loc[k]['quality']=='High') or (df.loc[k]['quality']=='Medium')
+
+    # if three criteria are met -> save catchment timeseries in timeseries_selected
+    if (t_length) & (a_qual) & (t_1980):
+        b.to_csv(f'{out_dir}/gsim/timeseries_selected/{catch_id}.csv')
+        
+def run_function2_parallel(
+    data_dir_list=list,
+    out_dir_list=list,
+    catch_list=list,
+    # threads=None
+    threads=100
+):
+    """
+    Runs function select_catchments in parallel.
+
+    data_dir_list: str, list, list of data dirs
+    out_dir_list: str, list, list of output directories
+    catch_list: str, list, list of catchment ids
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        select_catchments,
+        data_dir_list,
+        out_dir_list,
+        catch_list,
+    )
