@@ -27,15 +27,30 @@ from statsmodels.tools import add_constant
 from f_preprocess_discharge import *
 
 
-
-work_dir=Path('/tudelft.net/staff-umbrella/LSM root zone/global_sr')
+work_dir=Path('/scratch/fransjevanoors/global_sr')
+#work_dir=Path('/tudelft.net/staff-umbrella/LSM root zone/global_sr')
 data_dir=Path(f'{work_dir}/data')
 out_dir = Path(f"{work_dir}/output")
 
-# print('XXX')
+print(work_dir)
+print(out_dir)
+print(data_dir)
+
+# get list of all catchment ids available in the GSIM yearly discharge timeseries data
+gsim_id_list_up = []
+gsim_id_list_lo = []
+for filepath in glob.iglob(f'{data_dir}/GSIM_data/GSIM_indices/TIMESERIES/yearly/*'):
+    f = os.path.split(filepath)[1] # remove full path
+    f = f[:-5] # remove .year extension
+    fl = f.lower()
+    gsim_id_list_up.append(f)
+    gsim_id_list_lo.append(fl)
+print(gsim_id_list_lo)
+np.savetxt(f'{out_dir}/gsim/gsim_catch_id_list_up.txt',gsim_id_list_up,fmt='%s')
+np.savetxt(f'{out_dir}/gsim/gsim_catch_id_list_lo.txt',gsim_id_list_lo,fmt='%s')
 
 gsim_id_list_lo = np.loadtxt(f'{out_dir}/gsim/gsim_catch_id_list_lo.txt',dtype=str) 
-gsim_id_list_lo = gsim_id_list_lo[0:10]
+gsim_id_list_lo = gsim_id_list_lo[:]
 
 # define folder with discharge timeseries data
 fol_in = f'{data_dir}/GSIM_data/GSIM_indices/TIMESERIES/yearly/'
@@ -48,3 +63,4 @@ fol_in_list = [fol_in] * len(catch_list)
 fol_out_list = [fol_out] * len(catch_list)
 
 run_function_parallel(catch_list,fol_in_list,fol_out_list)
+print('done')
