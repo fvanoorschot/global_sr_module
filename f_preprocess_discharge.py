@@ -172,7 +172,7 @@ def select_catchments(data_dir,out_dir,catch_id):
     k = a['gsim.no'][0]   
 
     # check if end year later than 1980
-    t_1980 = a['end_year'][0]< datetime(year=1980,month=1,day=1)
+    t_1980 = a['end_year'][0]> datetime(year=1980,month=1,day=1)
 
     # check timeseries
     b = pd.read_csv(f'{out_dir}/gsim/timeseries/{catch_id}.csv',index_col=0)

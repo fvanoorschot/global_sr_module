@@ -49,12 +49,13 @@ print(data_dir)
 # np.savetxt(f'{out_dir}/gsim/gsim_catch_id_list_up.txt',gsim_id_list_up,fmt='%s')
 # np.savetxt(f'{out_dir}/gsim/gsim_catch_id_list_lo.txt',gsim_id_list_lo,fmt='%s')
 
+
 gsim_id_list_lo = np.loadtxt(f'{out_dir}/gsim/gsim_catch_id_list_lo.txt',dtype=str) 
 gsim_id_list_lo = gsim_id_list_lo[:]
 
 # check catchments that are not processed yet
 gsim_id_list_lo_done = []
-for filepath in glob.iglob(f'{out_dir}/gsim/timeseries/*'):
+for filepath in glob.iglob(f'{out_dir}/gsim/timeseries_selected/*'):
     f = os.path.split(filepath)[1] # remove full path
     f = f[:-4] # remove .csv extension
     gsim_id_list_lo_done.append(f)
@@ -62,16 +63,26 @@ for filepath in glob.iglob(f'{out_dir}/gsim/timeseries/*'):
 dif_list=list(set(gsim_id_list_lo)-set(gsim_id_list_lo_done))
 print(len(dif_list))
 gsim_id_list_lo=dif_list
+print(gsim_id_list_lo)
 
-# define folder with discharge timeseries data
-fol_in = f'{data_dir}/GSIM_data/GSIM_indices/TIMESERIES/yearly/'
-
-# define output folder
-fol_out = f'{out_dir}/gsim/'
-
+# make lists for parallel computation
 catch_list = gsim_id_list_lo
-fol_in_list = [fol_in] * len(catch_list)
-fol_out_list = [fol_out] * len(catch_list)
+data_dir_list = [data_dir] * len(catch_list)
+out_dir_list = [out_dir] * len(catch_list)
 
-run_function_parallel(catch_list,fol_in_list,fol_out_list)
+# run function
+run_function2_parallel(data_dir_list,out_dir_list,catch_list)
 print('done')
+
+# make lists of selected catchments
+gsim_id_list_up_sel = []
+gsim_id_list_lo_sel = []
+for filepath in glob.iglob(f'{out_dir}/gsim/timeseries_selected/*'):
+    f = os.path.split(filepath)[1] # remove full path
+    f = f[:-4] # remove .csv extension
+    fl = f.lower()
+    gsim_id_list_up_sel.append(f)
+    gsim_id_list_lo_sel.append(fl)
+    
+np.savetxt(f'{out_dir}/gsim/gsim_catch_id_list_up_sel.txt',gsim_id_list_up_sel,fmt='%s')
+np.savetxt(f'{out_dir}/gsim/gsim_catch_id_list_lo_sel.txt',gsim_id_list_lo_sel,fmt='%s')
