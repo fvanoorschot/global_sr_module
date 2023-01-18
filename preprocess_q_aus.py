@@ -13,10 +13,16 @@ import geopandas as gpd
 import glob
 from pathlib import Path
 
+# DELFTBLUE
 work_dir2=Path('/scratch/fransjevanoors/global_sr')
 work_dir=Path('/tudelft.net/staff-umbrella/LSM root zone/global_sr')
 data_dir=Path(f'{work_dir}/data')
 out_dir = Path(f"{work_dir2}/output")
+
+# WSL
+work_dir=Path('/mnt/u/LSM root zone/global_sr')
+data_dir=Path(f'{work_dir}/data')
+out_dir = Path(f"{work_dir}/output")
 
 print(work_dir)
 print(out_dir)
@@ -32,9 +38,9 @@ q_mmd = pd.read_csv(f'{data_dir}/CAMELS_AUS/03_streamflow/streamflow_mmd.csv')
 q_mmd.index = pd.to_datetime(q_mmd[['year','month','day']])
 
 for i in range(len(catch_id)):
-    df = pd.DataFrame(index=q_mmd.index, columns=['q_mmd'])
-    df.q_mmd = q_mmd[catch_id[i]]
-    df.q_mmd[df.q_mmd==-99.990000] = np.nan
+    df = pd.DataFrame(index=q_mmd.index, columns=['Q'])
+    df.Q = q_mmd[catch_id[i]]
+    df.Q[df.Q==-99.990000] = np.nan
     df.to_csv(f'{out_dir}/camels_aus/q_timeseries_daily/{catch_id[i]}.csv')
     
     df_y = df.groupby(pd.Grouper(freq='A')).mean()
