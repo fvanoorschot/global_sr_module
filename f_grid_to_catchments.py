@@ -246,53 +246,88 @@ def process_forcing_timeseries(catch_id,fol_in,fol_out,var):
     d = pd.DataFrame()
 
     # for j in variable list - list the timeseries csvs for the catch id
-    for j in var:
-        l = glob.glob(fol_in + f"*/{catch_id}*{j}*.csv")
-        if len(l)==0:
-            continue
+    l = glob.glob(fol_in + f"*/{catch_id}*.csv")
 
-        # combine variable timeseries in one dataframe
-        li=[] #make empty list
-        for filename in l:
-            df = pd.read_csv(filename, index_col=1, header=0)
-            df = df.drop(columns=['Unnamed: 0'])
-            df.index = pd.to_datetime(df.index)
-            li.append(df) #append dataframe to list
-        
-        frame = pd.concat(li, axis=0, ignore_index=False) #concatenate dataframes in li
-        col=frame.columns #get column names 
-        y_start,y_end = frame.index[0].year, frame.index[-1].year #add columns with start and end years
-        d[col] = frame #add frame data to dataframe d
-        d = d.rename(columns={col.values[0]:f'{j}'}) #rename column names to variable list names
+    # combine variable timeseries in one dataframe
+    li=[] #make empty list
+    for filename in l:
+        df = pd.read_csv(filename, index_col=0, header=0)
+        # df = df.drop(columns=['Unnamed: 0'])
+        df.index = pd.to_datetime(df.index)
+        df = df.loc['1981-01-01':'2010-12-31']
+        li.append(df) #append dataframe to list
 
-        # get daily timeseries and store as csv
-        if not os.path.exists(f'{fol_out}/daily'):
-             os.makedirs(f'{fol_out}/daily')
-        d.to_csv(f'{fol_out}/daily/{catch_id}_{y_start}_{y_end}.csv')
+    d = pd.DataFrame()
+    frame = pd.concat(li, axis=1, ignore_index=False) #concatenate dataframes in li
+    col=frame.columns #get column names 
+    y_start,y_end = frame.index[0].year, frame.index[-1].year #add columns with start and end years
+    d[col] = frame #add frame data to dataframe d
+    d = d.rename(columns={col.values[0]:f'{var[0]}'}) #rename column names to variable list names
+    d = d.rename(columns={col.values[1]:f'{var[1]}'})
+    d = d.rename(columns={col.values[2]:f'{var[2]}'})
+
+    # get daily timeseries and store as csv
+    if not os.path.exists(f'{fol_out}/daily'):
+         os.makedirs(f'{fol_out}/daily')
+    d.to_csv(f'{fol_out}/daily/{catch_id}_{y_start}_{y_end}.csv')
+
+    # get monthly timeseries and store as csv
+    if not os.path.exists(f'{fol_out}/monthly'):
+         os.makedirs(f'{fol_out}/monthly')
+    df_m = d.groupby(pd.Grouper(freq='M')).mean()
+    y_start,y_end = df_m.index[0].year, df_m.index[-1].year
+    df_m.to_csv(f'{fol_out}/monthly/{catch_id}_{y_start}_{y_end}.csv')    
+
+    # get climatology and store as csv
+    if not os.path.exists(f'{fol_out}/climatology'):
+         os.makedirs(f'{fol_out}/climatology')
+    df_m = df_m.groupby([df_m.index.month]).mean()
+    df_m.to_csv(f'{fol_out}/climatology/{catch_id}_{y_start}_{y_end}.csv')
+
+    # get yearly timeseries and store as csv
+    if not os.path.exists(f'{fol_out}/yearly'):
+         os.makedirs(f'{fol_out}/yearly')
+    df_y = d.groupby(pd.Grouper(freq='Y')).mean()
+    y_start,y_end = df_y.index[0].year, df_y.index[-1].year
+    df_y.to_csv(f'{fol_out}/yearly/{catch_id}_{y_start}_{y_end}.csv')
+
+    # get mean of timeseries and store as csv
+    if not os.path.exists(f'{fol_out}/mean'):
+         os.makedirs(f'{fol_out}/mean')
+    dm = d.mean()
+    dm.to_csv(f'{fol_out}/mean/{catch_id}_{y_start}_{y_end}.csv')
     
-        # get monthly timeseries and store as csv
-        if not os.path.exists(f'{fol_out}/monthly'):
-             os.makedirs(f'{fol_out}/monthly')
-        df_m = d.groupby(pd.Grouper(freq='M')).mean()
-        y_start,y_end = df_m.index[0].year, df_m.index[-1].year
-        df_m.to_csv(f'{fol_out}/monthly/{catch_id}_{y_start}_{y_end}.csv')    
 
-        # get climatology and store as csv
-        if not os.path.exists(f'{fol_out}/climatology'):
-             os.makedirs(f'{fol_out}/climatology')
-        df_m = df_m.groupby([df_m.index.month]).mean()
-        df_m.to_csv(f'{fol_out}/climatology/{catch_id}_{y_start}_{y_end}.csv')
         
-        # get yearly timeseries and store as csv
-        if not os.path.exists(f'{fol_out}/yearly'):
-             os.makedirs(f'{fol_out}/yearly')
-        df_y = d.groupby(pd.Grouper(freq='Y')).mean()
-        y_start,y_end = df_y.index[0].year, df_y.index[-1].year
-        df_y.to_csv(f'{fol_out}/yearly/{catch_id}_{y_start}_{y_end}.csv')
-        
-        # get mean of timeseries and store as csv
-        if not os.path.exists(f'{fol_out}/mean'):
-             os.makedirs(f'{fol_out}/mean')
-        dm = d.mean()
-        dm.to_csv(f'{fol_out}/mean/{catch_id}_{y_start}_{y_end}.csv')
-    
+def run_processing_function_parallel(
+    catch_list=list,
+    fol_in_list=list,
+    fol_out_list=list,
+    var_list=list,
+    # threads=None
+    threads=100
+):
+    """
+    Runs function preprocess_gsim_discharge  in parallel.
+​
+    catch_list:  str, list, list of catchmet ids
+    fol_in_list:     str, list, list of input folders
+    fol_out_list:   str, list, list of output folders
+    var_list: str,list, list of var list 
+    threads:         int,       number of threads (cores), when set to None use all available threads
+​
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        process_forcing_timeseries,
+        catch_list,
+        fol_in_list,
+        fol_out_list,
+        var_list,
+    )
