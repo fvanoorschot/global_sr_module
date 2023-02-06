@@ -18,7 +18,7 @@ import glob
 import os
 from scipy.optimize import least_squares
 import geopandas as gpd
-
+from pathos.threading import ThreadPool as Pool
 
 ## 1
 def p_mean(df):
@@ -27,7 +27,7 @@ def p_mean(df):
     df: pandas dataframe, P timeseries
     returns: mean P [mm/day]
     """
-    m = df['P'].mean()
+    m = df['p'].mean()
     return m
 
 def ep_mean(df):
@@ -36,7 +36,7 @@ def ep_mean(df):
     df: pandas dataframe, Ep timeseries
     returns: mean Ep [mm/day]
     """
-    m = df['Ep'].mean()
+    m = df['ep'].mean()
     return m
 
 def t_mean(df):
@@ -45,7 +45,7 @@ def t_mean(df):
     df: pandas dataframe, T timeseries
     returns: mean T [deg C]
     """
-    m = df['T'].mean()
+    m = df['tas'].mean()
     return m
 
 def ai(df):
@@ -54,7 +54,7 @@ def ai(df):
     df: pandas dataframe, P and Ep timeseries
     returns: aridity index AI [-]
     """
-    ai = df['P'].mean()/df['Ep'].mean()
+    ai = df['p'].mean()/df['ep'].mean()
     return ai
 
 def si_p(df):
@@ -63,7 +63,7 @@ def si_p(df):
     df: pandas dataframe, P timeseries
     returns: seasonality index SI_P [-]
     """
-    p = df['P']
+    p = df['p']
     for j in p.index:
         if(j.month==1 and j.day==1):
             start_date = j
@@ -89,7 +89,7 @@ def si_ep(df):
     df: pandas dataframe, Ep timeseries
     returns: seasonality index SI_Ep [-]
     """
-    ep = df['Ep']
+    ep = df['ep']
     for j in ep.index:
         if(j.month==1 and j.day==1):
             start_date = j
@@ -116,8 +116,8 @@ def phi(df):
     df: pandas dataframe, P and Ep timeseries
     returns: phase lag phi [months]
     """
-    p = df['P']
-    ep = df['Ep']
+    p = df['p']
+    ep = df['ep']
     for j in p.index:
         if(j.month==1 and j.day==1):
             start_date = j
@@ -152,7 +152,7 @@ def q_mean(df_q):
     return m
 
 ## 2 
-def catch_characteristics(var, catch_id_list, fol_in, fol_out):
+def catch_characteristics(var, catch_id, fol_in, fol_out):
     """
     calculate catchment characteristics and store in dataframe
     var:             str, list, list of variables (options: p_mean, q_mean, ep_mean, t_mean, ai, si_p, si_ep, phi, tc)
@@ -163,53 +163,91 @@ def catch_characteristics(var, catch_id_list, fol_in, fol_out):
     returns: table (cc) with catchment characteristics for all catchments       
     """
     # make cc dataframe
-    cc = pd.DataFrame(index=catch_id_list, columns=var)
-    
-    # loop over catchment ids
-    for j in catch_id_list:
-        l = glob.glob(f'{fol_in}/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
-        df = pd.read_csv(l[0], index_col=0)
-        df.index = pd.to_datetime(df.index)
-        
-        l_q = glob.glob(f'{fol_in}/discharge/timeseries/{j}*.csv') # find discharge data for catchment
-        df_q = pd.read_csv(l_q[0], index_col=0)
-        df_q.index = pd.to_datetime(df_q.index)
+    cc = pd.DataFrame(index=[catch_id], columns=var)
+    j = catch_id
+    l = glob.glob(f'{fol_in}/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
+    df = pd.read_csv(l[0], index_col=0)
+    df.index = pd.to_datetime(df.index)
 
-        # calculate catchment characteristics using functions in (1)
-        if 'p_mean' in var:
-            cc.loc[j,'p_mean'] = p_mean(df)
-        
-        if 'q_mean' in var:
-            cc.loc[j,'q_mean'] = q_mean(df_q)
+    l_q = glob.glob(f'{fol_in}/q_timeseries_selected/{j}*.csv') # find discharge data for catchment
+    df_q = pd.read_csv(l_q[0], index_col=0)
+    df_q.index = pd.to_datetime(df_q.index)
 
-        if 'ep_mean' in var:
-            cc.loc[j,'ep_mean'] = ep_mean(df)
+    # calculate catchment characteristics using functions in (1)
+    if 'p_mean' in var:
+        cc.loc[j,'p_mean'] = p_mean(df)
 
-        if 't_mean' in var:
-            cc.loc[j,'t_mean'] = t_mean(df)
+    if 'q_mean' in var:
+        cc.loc[j,'q_mean'] = q_mean(df_q)
 
-        if 'ai' in var:
-            cc.loc[j,'ai'] = ai(df)
+    if 'ep_mean' in var:
+        cc.loc[j,'ep_mean'] = ep_mean(df)
+
+    if 't_mean' in var:
+        cc.loc[j,'t_mean'] = t_mean(df)
+
+    if 'ai' in var:
+        cc.loc[j,'ai'] = ai(df)
+
+    if 'si_p' in var:
+        cc.loc[j,'si_p'] = si_p(df)
+
+    if 'si_ep' in var:
+        cc.loc[j,'si_ep'] = si_ep(df)    
+
+    if 'phi' in var:
+        cc.loc[j,'phi'] = phi(df)
+
+    # get tree cover statistics 
+    if 'tc' in var:
+        # l = glob.glob(f'{fol_in}/treecover/{j}*.csv') #find treecover tables for catchment
+        # dft = pd.read_csv(l[0], index_col=0)
+        # cc.loc[j,'tc'] = dft.loc[j,'mean_tc']
+        # cc.loc[j,'ntc'] = dft.loc[j,'mean_ntc']
+        # cc.loc[j,'nonveg'] = dft.loc[j,'mean_nonveg']
+        dft = pd.read_csv(f'{fol_in}/treecover/gsim_shapes_treecover.csv',index_col=0) #find treecover tables for catchment
+        cc.loc[j,'tc'] = dft.loc[j,'mean_tc']
+        cc.loc[j,'ntc'] = dft.loc[j,'mean_ntc']
+        cc.loc[j,'nonveg'] = dft.loc[j,'mean_nonveg']
+
+    a = pd.read_csv(f'{fol_in}/catchment_area.csv',index_col=0)
+    cc.loc[j,'area'] = a.loc[j,'area']
             
-        if 'si_p' in var:
-            cc.loc[j,'si_p'] = si_p(df)
-            
-        if 'si_ep' in var:
-            cc.loc[j,'si_ep'] = si_ep(df)    
-        
-        if 'phi' in var:
-            cc.loc[j,'phi'] = phi(df)
-        
-        # get tree cover statistics 
-        if 'tc' in var:
-            l = glob.glob(f'{fol_in}/earth_engine_timeseries/treecover/{j}*.csv') #find treecover tables for catchment
-            dft = pd.read_csv(l[0], index_col=0)
-            cc.loc[j,'tc'] = dft.loc[j,'mean_tc']
-            cc.loc[j,'ntc'] = dft.loc[j,'mean_ntc']
-            cc.loc[j,'nonveg'] = dft.loc[j,'mean_nonveg']
-            
-    cc.to_csv(f'{fol_out}/catchment_characteristics.csv') #store cc dataframe
+    cc.to_csv(f'{fol_out}/catchment_characteristics/{j}.csv') #store cc dataframe
     return cc
+
+def run_function_parallel_catch_characteristics(
+    var_list=list,
+    catch_list=list,
+    fol_in_list=list,
+    fol_out_list=list,
+    # threads=None
+    threads=100
+):
+    """
+    Runs function preprocess_gsim_discharge  in parallel.
+
+    var_list: str,list, list of variables
+    catch_list:  str, list, list of catchmet ids
+    fol_in_list:     str, list, list of input folders
+    fol_out_list:   str, list, list of output folders
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        catch_characteristics,
+        var_list,
+        catch_list,
+        fol_in_list,
+        fol_out_list,
+    )
 
 ## 3
 def geo_catchments(shape_dir,out_dir):
