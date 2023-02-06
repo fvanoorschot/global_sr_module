@@ -262,9 +262,9 @@ def process_forcing_timeseries(catch_id,fol_in,fol_out,var):
     col=frame.columns #get column names 
     y_start,y_end = frame.index[0].year, frame.index[-1].year #add columns with start and end years
     d[col] = frame #add frame data to dataframe d
-    d = d.rename(columns={col.values[0]:f'{var[0]}'}) #rename column names to variable list names
-    d = d.rename(columns={col.values[1]:f'{var[1]}'})
-    d = d.rename(columns={col.values[2]:f'{var[2]}'})
+    d = d.rename(columns={'Potential evaporation from GLEAM v3.5a':f'{var[0]}'}) #rename column names to variable list names
+    d = d.rename(columns={'precipitation_flux':f'{var[1]}'})
+    d = d.rename(columns={'air_temperature':f'{var[2]}'})
 
     # get daily timeseries and store as csv
     if not os.path.exists(f'{fol_out}/daily'):
