@@ -42,7 +42,8 @@ fol_out=f'{work_dir}/output/'
 # define variables of interest
 var=['p_mean','ep_mean','q_mean','t_mean','ai','si_p','si_ep','phi','tc','ntc','nonveg','area']
 
-catch_id_list = np.genfromtxt(f'{work_dir}/output/gsim_aus_catch_id_list_lo_sel.txt',dtype='str')[0:3] # test for 3 catchments -> run on delftblue for all catchments
+#catch_id_list = np.genfromtxt(f'{work_dir}/output/gsim_aus_catch_id_list_lo_sel.txt',dtype='str')[:] # test for 3 catchments -> run on delftblue for all catchments
+catch_id_list = np.genfromtxt(f'/scratch/fransjevanoors/dif.csv',dtype='str')[:] # test for 3 catchments -> run on delftblue for all catchments
 
 # make lists for parallel computation
 catch_list = catch_id_list.tolist()

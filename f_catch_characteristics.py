@@ -80,7 +80,10 @@ def si_p(df):
     a = np.zeros(12)
     for k in range(12):
         a[k] = np.abs(pm[k + 1]-(pa/12))
-    sip = (1/pa)*np.sum(a)
+    if (pa>0):
+        sip = (1/pa)*np.sum(a)
+    else:
+        sip = np.nan
     return sip
     
 def si_ep(df):
@@ -106,8 +109,10 @@ def si_ep(df):
     a = np.zeros(12)
     for k in range(12):
         a[k] = np.abs(epm[k + 1]-(epa/12))
-    siep = (1/epa)*np.sum(a)
-    
+    if (epa>0):
+        siep = (1/epa)*np.sum(a)
+    else:
+        siep=np.nan
     return siep
 
 def phi(df):
