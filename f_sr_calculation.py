@@ -187,12 +187,12 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
         si_max = 2.5 #maximum interception storage
 
         # run sd calculation
-        # b = sd_initial(sd_input, si_0, si_max, q_mean)[0] #b==0: closing wb, b==1: non-closing wb > no sd calculation
-        # if b==0:      
-        # save output dataframe from sd calculation
-        out = sd_initial(sd_input, si_0, si_max, q_mean)[1]
-        out.to_csv(f'{out_dir}/{catch_id}.csv')
-        return out
+        b = sd_initial(sd_input, si_0, si_max, q_mean)[0] #b==0: closing wb, b==1: non-closing wb > no sd calculation
+        if b==0:      
+            # save output dataframe from sd calculation
+            out = sd_initial(sd_input, si_0, si_max, q_mean)[1]
+            out.to_csv(f'{out_dir}/{catch_id}.csv')
+            return out
         
 ## 3
 def run_sd_calculation_parallel(
@@ -373,6 +373,43 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir):
         sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
         
         return(sr_df)
+
+    
+## 3
+def run_sr_calculation_parallel(
+    catch_id_list=list,
+    rp_array_list=list,
+    sd_dir_list=list,
+    out_dir_list=list,
+    # threads=None
+    threads=100
+):
+    """
+    Runs function area_weighted_shapefile_rasterstats in parallel.
+
+    catch_list:  str, list, list of catchment ids
+    rp_array_list:     str, list, list of return periods
+    sd_dir_list:   str, list, list of folder with sd
+    output_dir_list: str, list, list of output directories
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        run_sr_calculation,
+        catch_id_list,
+        rp_array_list,
+        sd_dir_list,
+        out_dir_list,
+    )
+
+    # return results    
 
 ## 7
 def merge_sr_catchments(sr_dir,out_dir):
