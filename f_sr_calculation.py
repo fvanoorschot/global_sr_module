@@ -24,6 +24,7 @@ import calendar
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import cartopy
+from pathos.threading import ThreadPool as Pool
 
 
 ## 1
@@ -58,8 +59,8 @@ def sd_initial(df, si_0, si_max, q_mean):
     df.loc[:,'Sd'] = np.nan
     
     # convert to numpy arrays (to speed up calculations)
-    p = np.array(df.P.values)
-    ep = np.array(df.Ep.values)
+    p = np.array(df.p.values)
+    ep = np.array(df.ep.values)
     
     si1 = np.zeros(len(df))
     pe = np.zeros(len(df))
@@ -144,12 +145,12 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
     pep_ts.index = pd.to_datetime(pep_ts.index)
 
     # convert to monthly dataframes
-    df_monthly = pd.DataFrame(index=pd.date_range(pep_ts.index[0],pep_ts.index[-1],freq='M'), columns=['P','Ep'])
-    df_monthly[['P','Ep']] = pep_ts[['P','Ep']].groupby(pd.Grouper(freq="M")).sum()
+    df_monthly = pd.DataFrame(index=pd.date_range(pep_ts.index[0],pep_ts.index[-1],freq='M'), columns=['p','ep'])
+    df_monthly[['p','ep']] = pep_ts[['p','ep']].groupby(pd.Grouper(freq="M")).sum()
 
     # calculate start hydroyear -> month after on average the wettest month
     df_monthly_mean = df_monthly.groupby([df_monthly.index.month]).mean()
-    wettest_month = (df_monthly_mean['P']-df_monthly_mean['Ep']).idxmax()
+    wettest_month = (df_monthly_mean['p']-df_monthly_mean['ep']).idxmax()
     hydro_year_start_month = wettest_month+1
     if hydro_year_start_month==13:
         hydro_year_start_month=1
@@ -177,8 +178,8 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
         q_mean = q_ts.loc[start_date:end_date,'Q'].mean()
 
         # prepare input dataframe for sd calculation
-        sd_input = pd.DataFrame(index=pd.date_range(start_date,end_date,freq='d'), columns=['P','Ep','date_start','date_end'])
-        sd_input[['P','Ep']] = pep_ts[['P','Ep']]
+        sd_input = pd.DataFrame(index=pd.date_range(start_date,end_date,freq='d'), columns=['p','ep','date_start','date_end'])
+        sd_input[['p','ep']] = pep_ts[['p','ep']]
         sd_input[['date_start','date_end']] = start_date, end_date
         si_0 = 0 #initial interception storage
         si_max = 2.5 #maximum interception storage
@@ -189,9 +190,45 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
             # save output dataframe from sd calculation
             out = sd_initial(sd_input, si_0, si_max, q_mean)[1]
             out.to_csv(f'{out_dir}/{catch_id}.csv')
-            
             return out
+        
 ## 3
+def run_sd_calculation_parallel(
+    catch_id_list=list,
+    pep_dir_list=list,
+    q_dir_list=list,
+    out_dir_list=list,
+    # threads=None
+    threads=100
+):
+    """
+    Runs function area_weighted_shapefile_rasterstats in parallel.
+
+    catch_list:  str, list, list of catchment ids
+    pep_dir_list:     str, list, list of input folders for pep forcing data
+    q_dir_list:   str, list, list of folder with q timeseries
+    output_dir_list: str, list, list of output directories
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        run_sd_calculation,
+        catch_id_list,
+        pep_dir_list,
+        q_dir_list,
+        out_dir_list,
+    )
+
+    # return results
+        
+## 4
 def plot_sd(catch_id, sd_dir):
     """
     plot timeseries of storage deficits for catchment catch id
@@ -211,7 +248,7 @@ def plot_sd(catch_id, sd_dir):
     ax.set_title(f'catchment {catch_id}')
             
             
-## 4
+## 5
 def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,date_end):
     """
     calculate sr for different return periods - min max root zone year approach from Stijn??
@@ -296,7 +333,7 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
     return(Sd_T)   
 
        
-## 5
+## 6
 def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir):
     """
     run sr calculation
@@ -335,7 +372,7 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir):
         
         return(sr_df)
 
-## 6
+## 7
 def merge_sr_catchments(sr_dir,out_dir):
     """
     merge sr from individual catchments into one dataframe
