@@ -95,6 +95,8 @@ def sd_initial(df, si_0, si_max, q_mean):
     #check if water balance is ok
     if Et_mean<0: # if this is the case, it is not possible to calculate sd
         b = 1 # wb not ok
+        sd[:] = np.nan
+        et[:]=np.nan
     else:
         b = 0 # wb ok
         #calculate daily Et (EP(daily)*(Et_sum/EP_sum)) and Sd
@@ -107,14 +109,14 @@ def sd_initial(df, si_0, si_max, q_mean):
             et[l] = ep[l]/EP_mean * Et_mean
             sd[l] = min(0,sd[l-1]+pe[l]-et[l])
 
-        # add numpy arrays to dataframe
-        df.Si_1 = si1
-        df.Si_2 = si2
-        df.Si_3 = si3
-        df.Pe = pe
-        df.Ei = ei
-        df.Sd = sd
-        df.Et = et
+    # add numpy arrays to dataframe
+    df.Si_1 = si1
+    df.Si_2 = si2
+    df.Si_3 = si3
+    df.Pe = pe
+    df.Ei = ei
+    df.Sd = sd
+    df.Et = et
     
     # if(df.Sd.mean()==0):
     #     df.Sd=np.nan
@@ -185,12 +187,12 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
         si_max = 2.5 #maximum interception storage
 
         # run sd calculation
-        b = sd_initial(sd_input, si_0, si_max, q_mean)[0] #b==0: closing wb, b==1: non-closing wb > no sd calculation
-        if b==0:      
-            # save output dataframe from sd calculation
-            out = sd_initial(sd_input, si_0, si_max, q_mean)[1]
-            out.to_csv(f'{out_dir}/{catch_id}.csv')
-            return out
+        # b = sd_initial(sd_input, si_0, si_max, q_mean)[0] #b==0: closing wb, b==1: non-closing wb > no sd calculation
+        # if b==0:      
+        # save output dataframe from sd calculation
+        out = sd_initial(sd_input, si_0, si_max, q_mean)[1]
+        out.to_csv(f'{out_dir}/{catch_id}.csv')
+        return out
         
 ## 3
 def run_sd_calculation_parallel(
