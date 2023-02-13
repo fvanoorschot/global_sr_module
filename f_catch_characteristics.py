@@ -19,6 +19,7 @@ import os
 from scipy.optimize import least_squares
 import geopandas as gpd
 from pathos.threading import ThreadPool as Pool
+from scipy.optimize import minimize
 
 ## 1
 def p_mean(df):
@@ -56,6 +57,29 @@ def ai(df):
     """
     ai = df['p'].mean()/df['ep'].mean()
     return ai
+
+def hai(df):
+    """
+    calculate holdridge aridity index 
+    df: pandas dataframe, P and T timeseries
+    returns:holdrige aridity index HAI [-]
+    """
+    pmean = df['p'].mean()
+    t = df['tas']
+    temp_adjusted = np.zeros(len(t))
+
+    for i in range(1,len(t)):
+        if t[i] < 0:
+            temp_adjusted[i-1] = 0
+        elif t[i] > 30:
+            temp_adjusted[i-1] = 30
+        else:
+            temp_adjusted[i-1] = t[i]            
+
+    T = np.sum(temp_adjusted)
+    HAI = (58.93 * (T/len(t)))/(pmean*365)
+    
+    return HAI
 
 def si_p(df):
     """
@@ -156,86 +180,441 @@ def q_mean(df_q):
     m = df_q['Q'].mean()
     return m
 
-## 2 
-def catch_characteristics(var, catch_id, fol_in, fol_out):
+def idu_mean(df):
     """
-    calculate catchment characteristics and store in dataframe
-    var:             str, list, list of variables (options: p_mean, q_mean, ep_mean, t_mean, ai, si_p, si_ep, phi, tc)
-    catch_id_list:   str, list, list of catchment ids
-    fol_in:          str, dir, directory with timeseries data
-    fol_out:         str, dir, directory where to store the output tables
+    interstorm duration: mean consecutive days of p<1mm
+    df: pandas dataframe, P and Ep timeseries
+    returns: idu_mean [days]
+    """
+    p = df['p']
+    interstorm = []
+    count = 0
+
+    for j in range(len(p)):
+        if p[j] < 1:
+            count += 1
+        elif p[j] >= 1 and count > 0:
+            interstorm.append(count)
+            count = 0 
+    idu_mean = int(np.mean(interstorm))
+    return idu_mean
+
+def idu_max(df):
+    """
+    interstorm duration: mean annual maximum consecutive days of p<1mm
+    df: pandas dataframe, P and Ep timeseries
+    returns: idu_max [days]
+    """
+    df['year'] = pd.DatetimeIndex(df.index).year
+    yearstart = df['year'][0]
+    yearend = df['year'][-1]
+    a = []
+    for year in range(yearstart,yearend+1):
+        dfy = df[df['year']==year]
+        p = dfy['p']
+        interstorm=[]
+        count = 0
+        for j in range(len(p)):
+            if p[j] < 1:
+                count += 1
+            elif p[j] >= 1 and count > 0:
+                interstorm.append(count)
+                count = 0 
+        a.append(max(interstorm))
+    idu_max = int(np.mean(a))
+    return idu_max
+
+def hpd_mean(df):
+    """
+    high precipitation days: mean consecutive days of p>5*pmean
+    df: pandas dataframe, P and Ep timeseries
+    returns: hpd_mean [days]
+    """
+    p = df['p']
+    pmean = df['p'].mean()
+    high_p = []
+    count = 0
+
+    for j in range(len(p)):
+        if p[j] > (5*pmean):
+            count += 1
+        elif p[j] <= (5*pmean) and count > 0:
+            high_p.append(count)
+            count = 0 
+    if (len(high_p))>0:
+        hpd_mean = int(np.mean(high_p))
+    else:
+        hpd_mean=0        
+    return hpd_mean
+
+def hpd_max(df):
+    """
+    high precipitation days: mean annual max consecutive days of p>5*pmean
+    df: pandas dataframe, P and Ep timeseries
+    returns: hpd_max [days]
+    """
+    df['year'] = pd.DatetimeIndex(df.index).year
+    yearstart = df['year'][0]
+    yearend = df['year'][-1]
+    a = []
+    for year in range(yearstart,yearend+1):
+        dfy = df[df['year']==year]
+        p = dfy['p']
+        pmean = dfy['p'].mean()
+        high_p=[]
+        count = 0
+        for j in range(len(p)):
+            if p[j] > (5*pmean):
+                count += 1
+            elif p[j] <= (5*pmean) and count > 0:
+                high_p.append(count)
+                count = 0 
+        if (len(high_p))>0:
+            a.append(max(high_p))
+            hpd_max = int(np.mean(a))
+        else:
+            hpd_max=0
+    return hpd_max
+
+def hpf(df):
+    """
+    high precipitation frequency: days with p>5*pmean / total days
+    df: pandas dataframe, P and Ep timeseries
+    returns: hpf [-]
+    """
+    p = df['p']
+    pmean = df['p'].mean()
+    count = 0
+
+    for j in range(len(p)):
+        if p[j] > (5*pmean):
+            count += 1
+    hpf = count/len(p)
+    return hpf
+
+def lpf(df):
+    """
+    low precipitation frequency: days with p<1mm / total days
+    df: pandas dataframe, P and Ep timeseries
+    returns: lpf [-]
+    """
+    p = df['p']
+    count = 0
+
+    for j in range(len(p)):
+        if p[j] <1:
+            count += 1
+    lpf = count/len(p)
+    return lpf
+
+def ftf(df):
+    """
+    freezing temperatures frequency: days with T<0 degreeC / total days
+    df: pandas dataframe, tas timeseries
+    returns: ftf [-]
+    """
+    t = df['tas']
+    count = 0
+    for j in range(len(t)):
+        if t[j] < 0:
+            count += 1
+    ftf = count/len(t)
+    return ftf
+
+def tdiff_mean(df):
+    """
+    mean temperature difference: monthly mean t max - monthly mean t min
+    df: pandas dataframe, tas timeseries
+    returns: tdiff_mean [-]
+    """
+    df['year'] = pd.DatetimeIndex(df.index).year
+    yearstart = df['year'][0]
+    yearend = df['year'][-1]
+    tdiff = []
+    for year in range(yearstart,yearend+1):
+        dfy = df[df['year']==year]
+        dfy = dfy.groupby(pd.Grouper(freq="M")).mean()
+        t = dfy['tas']
+        tmax = dfy['tas'].max()
+        tmin = dfy['tas'].min()
+        tdiff.append(tmax-tmin)
+    tdiff_mean = np.mean(tdiff)
+    return tdiff_mean
+
+def tdiff_max(df):
+    """
+    max temperature difference: monthly mean t max - monthly mean t min
+    df: pandas dataframe, tas timeseries
+    returns: tdiff_max [-]
+    """
+    df['year'] = pd.DatetimeIndex(df.index).year
+    yearstart = df['year'][0]
+    yearend = df['year'][-1]
+    tdiff = []
+    for year in range(yearstart,yearend+1):
+        dfy = df[df['year']==year]
+        dfy = dfy.groupby(pd.Grouper(freq="M")).mean()
+        t = dfy['tas']
+        tmax = dfy['tas'].max()
+        tmin = dfy['tas'].min()
+        tdiff.append(tmax-tmin)
+    tdiff_max = np.max(tdiff)
+    return tdiff_max
+
+#Function for Seasonality Timing Index
+def ST_calc(dP,dT):
+    days = 366
+    ST = dP[0] * np.sign(dT[0]) * np.cos((np.pi * (dP[1] - dT[1]))/days)
+    return ST
+
+#Functions to compute Seasonal variability indexes
+def T_daily(dT):
+    t = np.linspace(1,366,366)
+    days = 366
+    T = T_mean + dT[0] * np.sin((2*np.pi * (t-dT[1]))/days)
+    return T
+
+def Cal_T_daily(dT):
+    days = 366
+    T_calc = T_daily(dT)
     
-    returns: table (cc) with catchment characteristics for all catchments       
+    return (np.sum(np.abs(T_calc - T_obs)))/days
+
+def P_daily(dP):
+    t = np.linspace(1,366,366)
+    days = 366
+    P = P_mean * (1 + dP[0] * np.sin((2*np.pi * (t-dP[1]))/days))
+    return P
+
+def Cal_P_daily(dP):
+    days = 366
+    P_calc = P_daily(dP)
+    
+    return (np.sum(np.abs(P_calc - P_obs)))/days
+
+def E_daily(dE):
+#    t = np.linspace(1,366,366)
+    t = np.linspace(1,366,366)
+
+    days = 366
+    E = E_mean * (1 + dE[0] * np.sin((2*np.pi * (t-dE[1]))/days))
+    return E
+
+def Cal_E_daily(dE):
+    days = 366
+    E_calc = E_daily(dE)
+    
+    return (np.sum(np.abs(E_calc - E_obs)))/days
+
+#Compute the seasonality variability indexes
+def seas_var_indices(df):
     """
-    # make cc dataframe
-    cc = pd.DataFrame(index=[catch_id], columns=var)
+    calculate seasonality variability indices from Berghuijs 2014
+    de, dp, dt: seasonal ep, p and t amplitudes
+    sp, st, se: phase shifts of p, t and ep
+    sd: phase difference between p and ep
+    sti: seasonality timing index
+    df: pandas dataframe, P and Ep timeseries
+    returns: de,dp,dt,sp,st,se,sd,sti
+    """
+    global T_mean
+    global P_mean
+    global E_mean
+    global T_obs
+    global P_obs
+    global E_obs
+    
+    data_d = df.resample('d').mean().bfill()
+    daily_sliced_mean = df.groupby([data_d.index.month, data_d.index.day]).agg(np.mean)
+
+    T1 = np.zeros((366))
+    P1 = np.zeros((366))
+    E1 = np.zeros((366))
+    count = 0
+
+    for k in range(1,13):
+        for j in range(1,len(daily_sliced_mean['tas'][k])+1):
+            T1[count] = daily_sliced_mean['tas'][k,j]
+            P1[count] = daily_sliced_mean['p'][k,j]
+            E1[count] = daily_sliced_mean['ep'][k,j]
+            count += 1
+    t = np.linspace(1,366,366)
+
+    T_obs = T1
+    P_obs = P1
+    E_obs = E1
+
+    T_mean = np.nanmean(T_obs)
+    P_mean = np.nanmean(P_obs)
+    E_mean = np.nanmean(E_obs)
+
+    x0_T = [5, 110]
+    x0_P = [0.3, 40]
+    x0_E = [0.4, 40]
+    lb = [0, np.inf]
+    ub = [0, 366]
+
+    res_T = minimize(Cal_T_daily, x0_T,method='Powell', bounds=(lb,ub))
+    res_P = minimize(Cal_P_daily, x0_P, method='Powell', bounds=(lb,ub))
+    res_E = minimize(Cal_E_daily, x0_E, method='Powell', bounds=(lb,ub))
+
+    dp = res_P.x[0]
+    sp = res_P.x[1] / 366
+    dt = res_T.x[0]
+    st = res_T.x[1] / 366
+
+    if abs(sp - st) <= 0.5:
+        sd = sp - st
+
+    elif (sp - st) > 0.5:
+        sd = -1 + (sp - st)
+
+    else:
+        sd = 1 + (sp - st)
+
+    de = res_E.x[0]
+    se = res_E.x[1] / 366
+
+    #Compute Seasonality Timing index
+    sti = ST_calc(res_P.x,res_T.x)
+
+    return de,dp,dt,sp,st,se,sd,sti
+
+
+def catch_characteristics_climate(var_cl, catch_id,work_dir):
+    """
+    calculate catchment characteristics - climate variables
+    var_cl: define list of climate variables
+    catch_id: catchment id
+    returns: dataframe with climate variables for catchment
+    """
+    cc_cl = pd.DataFrame(index=[catch_id], columns=var_cl)
     j = catch_id
-    l = glob.glob(f'{fol_in}/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
+    l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
     df = pd.read_csv(l[0], index_col=0)
     df.index = pd.to_datetime(df.index)
 
-    l_q = glob.glob(f'{fol_in}/q_timeseries_selected/{j}*.csv') # find discharge data for catchment
+    l_q = glob.glob(f'{work_dir}/output/q_timeseries_selected/{j}*.csv') # find discharge data for catchment
     df_q = pd.read_csv(l_q[0], index_col=0)
     df_q.index = pd.to_datetime(df_q.index)
 
     # calculate catchment characteristics using functions in (1)
-    if 'p_mean' in var:
-        cc.loc[j,'p_mean'] = p_mean(df)
+    if 'p_mean' in var_cl:
+        cc_cl.loc[j,'p_mean'] = p_mean(df)
 
-    if 'q_mean' in var:
-        cc.loc[j,'q_mean'] = q_mean(df_q)
+    if 'q_mean' in var_cl:
+        cc_cl.loc[j,'q_mean'] = q_mean(df_q)
 
-    if 'ep_mean' in var:
-        cc.loc[j,'ep_mean'] = ep_mean(df)
+    if 'ep_mean' in var_cl:
+        cc_cl.loc[j,'ep_mean'] = ep_mean(df)
 
-    if 't_mean' in var:
-        cc.loc[j,'t_mean'] = t_mean(df)
+    if 't_mean' in var_cl:
+        cc_cl.loc[j,'t_mean'] = t_mean(df)
 
-    if 'ai' in var:
-        cc.loc[j,'ai'] = ai(df)
+    if 'ai' in var_cl:
+        cc_cl.loc[j,'ai'] = ai(df)
 
-    if 'si_p' in var:
-        cc.loc[j,'si_p'] = si_p(df)
+    if 'si_p' in var_cl:
+        cc_cl.loc[j,'si_p'] = si_p(df)
 
-    if 'si_ep' in var:
-        cc.loc[j,'si_ep'] = si_ep(df)    
+    if 'si_ep' in var_cl:
+        cc_cl.loc[j,'si_ep'] = si_ep(df)    
 
-    if 'phi' in var:
-        cc.loc[j,'phi'] = phi(df)
+    if 'phi' in var_cl:
+        cc_cl.loc[j,'phi'] = phi(df)
 
-    # get tree cover statistics 
-    if 'tc' in var:
-        # l = glob.glob(f'{fol_in}/treecover/{j}*.csv') #find treecover tables for catchment
-        # dft = pd.read_csv(l[0], index_col=0)
-        # cc.loc[j,'tc'] = dft.loc[j,'mean_tc']
-        # cc.loc[j,'ntc'] = dft.loc[j,'mean_ntc']
-        # cc.loc[j,'nonveg'] = dft.loc[j,'mean_nonveg']
-        dft = pd.read_csv(f'{fol_in}/treecover/gsim_shapes_treecover.csv',index_col=0) #find treecover tables for catchment
-        cc.loc[j,'tc'] = dft.loc[j,'mean_tc']
-        cc.loc[j,'ntc'] = dft.loc[j,'mean_ntc']
-        cc.loc[j,'nonveg'] = dft.loc[j,'mean_nonveg']
+    if 'tdiff_mean' in var_cl:
+        cc_cl.loc[j,'tdiff_mean'] = tdiff_mean(df)
+    if 'tdiff_max' in var_cl:
+        cc_cl.loc[j,'tdiff_max'] = tdiff_max(df)
 
-    a = pd.read_csv(f'{fol_in}/catchment_area.csv',index_col=0)
-    cc.loc[j,'area'] = a.loc[j,'area']
-            
-    cc.to_csv(f'{fol_out}/catchment_characteristics/{j}.csv') #store cc dataframe
-    return cc
+    if 'hai' in var_cl:
+        cc_cl.loc[j,'hai'] = hai(df)
+    if 'ftf' in var_cl:
+        cc_cl.loc[j,'ftf'] = ftf(df)
+
+    if 'idu_mean' in var_cl:
+        cc_cl.loc[j,'idu_mean'] = idu_mean(df)
+    if 'idu_max' in var_cl:
+        cc_cl.loc[j,'idu_max'] = idu_max(df)
+
+    if 'hpd_mean' in var_cl:
+        cc_cl.loc[j,'hpd_mean'] = hpd_mean(df)
+    if 'hpd_max' in var_cl:
+        cc_cl.loc[j,'hpd_max'] = hpd_max(df)
+
+    if 'hpf' in var_cl:
+        cc_cl.loc[j,'hpf'] = hpf(df)
+    if 'lpf' in var_cl:
+        cc_cl.loc[j,'lpf'] = lpf(df)
+
+    if 'sti' in var_cl:
+        cc_cl.loc[j,['de','dp','dt','sp','st','se','sd','sti']] = seas_var_indices(df)
+        
+    return cc_cl
+
+def catch_characteristics_landscape(var_lc,catch_id,work_dir):
+    """
+    calculate catchment characteristics - landscape variables
+    var_lc: define list of landscape variables
+    catch_id: catchment id
+    returns: dataframe with landscape variables for catchment
+    """
+    cc_lc = pd.DataFrame(index=[catch_id], columns=var_lc)
+    j = catch_id
+    l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
+    df = pd.read_csv(l[0], index_col=0)
+    df.index = pd.to_datetime(df.index)
+
+    if 'tc' in var_lc:
+        dft = pd.read_csv(f'{work_dir}/output/treecover/gsim_shapes_treecover.csv',index_col=0) #find treecover tables for catchment
+        cc_lc.loc[j,'tc'] = dft.loc[j,'mean_tc'] /100
+        cc_lc.loc[j,'ntc'] = dft.loc[j,'mean_ntc']/100
+        cc_lc.loc[j,'nonveg'] = dft.loc[j,'mean_nonveg']/100
+
+    if 'area' in var_lc:
+        a = pd.read_csv(f'{work_dir}/output/catchment_area.csv',index_col=0)
+        cc_lc.loc[j,'area'] = a.loc[j,'area']
+
+    # add gsim variables
+    gsim_var=['ir.mean','ele.mean','ele.min','ele.max','dr.mean','slp.mean','scl.mean','snd.mean','slt.mean','tp.mean']
+    df_gsim = pd.read_csv(f'{work_dir}/data/GSIM_data/GSIM_metadata/GSIM_catalog/GSIM_catchment_characteristics.csv',index_col=0)
+    k = j.upper()
+    if k in df_gsim.index.values:
+        cc_lc.loc[j,['ir_mean','el_mean','el_min','el_max','drd','slp_mean','cla','snd','slt','tpi']] = df_gsim.loc[k,gsim_var].values
+    else:
+        # use aus information
+        df_aus = pd.read_csv(f'{work_dir}/data/CAMELS_AUS/CAMELS_AUS_Attributes-Indices_MasterTable.csv',index_col=0)
+        cc_lc.loc[j,['el_mean','el_min','el_max','drd','slp_mean','cla','snd']] = df_aus.loc[j,['elev_mean','elev_min','elev_max','strdensity','mean_slope_pct','claya','sanda']].values  
+        cc_lc.loc[j,['ir_mean','slt','tpi']] = np.nan # not available for camels aus    
+    return cc_lc
+
+def catch_characteristics(var_lc,var_cl, catch_id, work_dir):
+    """
+    combine climate and landscape variables in one dataframe
+    returns: catchment characteristics dataframe cc - saved as csv file
+    """
+    cc_lc = catch_characteristics_landscape(var_lc,catch_id,work_dir)
+    cc_cl = catch_characteristics_climate(var_cl, catch_id,work_dir)
+    cc = pd.concat([cc_cl,cc_lc],axis=1)
+    cc.to_csv(f'{work_dir}/output/catchment_characteristics/{catch_id}.csv') #store cc dataframe
+    
 
 def run_function_parallel_catch_characteristics(
-    var_list=list,
+    var_lc_list=list,
+    var_cl_list=list,
     catch_list=list,
-    fol_in_list=list,
-    fol_out_list=list,
+    work_dir_list=list,
     # threads=None
     threads=100
-):
+    ):
     """
     Runs function preprocess_gsim_discharge  in parallel.
 
-    var_list: str,list, list of variables
+    var_cl_list: str,list, list of climate variables
+    var_lc_list: str,list, list of landscape variables
     catch_list:  str, list, list of catchmet ids
-    fol_in_list:     str, list, list of input folders
-    fol_out_list:   str, list, list of output folders
+    work_dir_list:     str, list, list of work dir
     threads:         int,       number of threads (cores), when set to None use all available threads
 
     Returns: None
@@ -248,10 +627,10 @@ def run_function_parallel_catch_characteristics(
     # Run parallel models
     results = pool.map(
         catch_characteristics,
-        var_list,
+        var_lc_list,
+        var_cl_list,
         catch_list,
-        fol_in_list,
-        fol_out_list,
+        work_dir_list,
     )
     
 

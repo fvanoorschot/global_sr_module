@@ -40,7 +40,7 @@ pep_dir = f'{work_dir}/output/forcing_timeseries/processed/daily'
 q_dir = f'{work_dir}/output/q_timeseries_selected'
 out_dir = f'{work_dir}/output/sr_calculation/sd_catchments'
 
-c = np.loadtxt(f'{work_dir}/output/gsim_aus_catch_id_list_lo_sel_area_wb.txt',dtype=str) 
+c = np.loadtxt(f'{work_dir}/output/sr_calculation/sd_list.txt',dtype=str) 
 catch_id_list = c[:]
 pep_dir_list = [pep_dir] * len(catch_id_list)
 q_dir_list = [q_dir] * len(catch_id_list)

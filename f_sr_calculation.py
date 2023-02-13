@@ -201,7 +201,7 @@ def run_sd_calculation_parallel(
     q_dir_list=list,
     out_dir_list=list,
     # threads=None
-    threads=100
+    threads=200
 ):
     """
     Runs function area_weighted_shapefile_rasterstats in parallel.
@@ -278,14 +278,26 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
     # CHECK THIS PROCEDURE AGAIN FRANSJE
     Sd_max=[]
     Sd_maxmin = []
-    for i in range(0,total_years,1):
-        sd_max_i = max(Sd.loc[str(years[i])+'-'+str(date_start):str(years[i+1])+'-'+str(date_end)]) #max value
-        Sd_max.append(sd_max_i) #append max deficit per year
+    if (str(date_start)=='1-1'):
+        for i in range(0,total_years+1,1):
+            sd_max_i = max(Sd.loc[str(years[i])+'-'+str(date_start):str(years[i])+'-'+str(date_end)]) #max value
+            Sd_max.append(sd_max_i) #append max deficit per year
+            # print(str(years[i])+'-'+str(date_start), str(years[i])+'-'+str(date_end))
 
-        sd_max_ix = Sd.loc[str(years[i])+'-'+str(date_start):str(years[i+1])+'-'+str(date_end)].idxmax() #find index of max value
-        sd_hystart_maxvalue = Sd.loc[str(years[i])+'-'+str(date_start):sd_max_ix] #timeseries from start hydroyear to index of max value
-        min_value = min(sd_hystart_maxvalue) #find min value in timeseries before max value
-        Sd_maxmin.append(sd_max_i-min_value) #append max-min sd per year
+            sd_max_ix = Sd.loc[str(years[i])+'-'+str(date_start):str(years[i])+'-'+str(date_end)].idxmax() #find index of max value
+            sd_hystart_maxvalue = Sd.loc[str(years[i])+'-'+str(date_start):sd_max_ix] #timeseries from start hydroyear to index of max value
+            min_value = min(sd_hystart_maxvalue) #find min value in timeseries before max value
+            Sd_maxmin.append(sd_max_i-min_value) #append max-min sd per year
+    else:
+        for i in range(0,total_years,1):
+            sd_max_i = max(Sd.loc[str(years[i])+'-'+str(date_start):str(years[i+1])+'-'+str(date_end)]) #max value
+            Sd_max.append(sd_max_i) #append max deficit per year
+            # print(str(years[i])+'-'+str(date_start), str(years[i+1])+'-'+str(date_end))
+
+            sd_max_ix = Sd.loc[str(years[i])+'-'+str(date_start):str(years[i+1])+'-'+str(date_end)].idxmax() #find index of max value
+            sd_hystart_maxvalue = Sd.loc[str(years[i])+'-'+str(date_start):sd_max_ix] #timeseries from start hydroyear to index of max value
+            min_value = min(sd_hystart_maxvalue) #find min value in timeseries before max value
+            Sd_maxmin.append(sd_max_i-min_value) #append max-min sd per year
 
     # define root zone year
     sd_max_month = Sd.groupby(pd.Grouper(freq='M')).max() #calculate maximum sd per month
@@ -300,15 +312,27 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
     # calculate annual max Sd - without iterations for rootzone years -> CHECK THIS APPROACH
     Sd_max_rz_year = []
     Sd_maxmin_rz_year = []
-    for i in range(0,total_years,1):
-        sd_max_i = max(Sd.loc[str(years[i])+'-'+str(date_start_rz_year):str(years[i+1])+'-'+str(date_end_rz_year)])
-        Sd_max_rz_year.append(sd_max_i) #append max deficit per year
+    if (str(date_start_rz_year)=='1-1'):
+        for i in range(0,total_years+1,1):
+            sd_max_i = max(Sd.loc[str(years[i])+'-'+str(date_start_rz_year):str(years[i])+'-'+str(date_end_rz_year)])
+            Sd_max_rz_year.append(sd_max_i) #append max deficit per year
+            # print(str(years[i])+'-'+str(date_start_rz_year), str(years[i])+'-'+str(date_end_rz_year))
 
-        sd_max_ix = Sd.loc[str(years[i])+'-'+str(date_start_rz_year):str(years[i+1])+'-'+str(date_end_rz_year)].idxmax() #find index of max value
-        sd_hystart_maxvalue = Sd.loc[str(years[i])+'-'+str(date_start_rz_year):sd_max_ix] #timeseries from start rzyear to index of max value
-        min_value = min(sd_hystart_maxvalue) #find min value in timeseries before max value
-        Sd_maxmin_rz_year.append(sd_max_i-min_value) #append max-min sd per year
-            
+            sd_max_ix = Sd.loc[str(years[i])+'-'+str(date_start_rz_year):str(years[i])+'-'+str(date_end_rz_year)].idxmax() #find index of max value
+            sd_hystart_maxvalue = Sd.loc[str(years[i])+'-'+str(date_start_rz_year):sd_max_ix] #timeseries from start rzyear to index of max value
+            min_value = min(sd_hystart_maxvalue) #find min value in timeseries before max value
+            Sd_maxmin_rz_year.append(sd_max_i-min_value) #append max-min sd per year
+    else:
+        for i in range(0,total_years,1):
+            sd_max_i = max(Sd.loc[str(years[i])+'-'+str(date_start_rz_year):str(years[i+1])+'-'+str(date_end_rz_year)])
+            Sd_max_rz_year.append(sd_max_i) #append max deficit per year
+            # print(str(years[i])+'-'+str(date_start_rz_year), str(years[i+1])+'-'+str(date_end_rz_year))
+
+            sd_max_ix = Sd.loc[str(years[i])+'-'+str(date_start_rz_year):str(years[i+1])+'-'+str(date_end_rz_year)].idxmax() #find index of max value
+            sd_hystart_maxvalue = Sd.loc[str(years[i])+'-'+str(date_start_rz_year):sd_max_ix] #timeseries from start rzyear to index of max value
+            min_value = min(sd_hystart_maxvalue) #find min value in timeseries before max value
+            Sd_maxmin_rz_year.append(sd_max_i-min_value) #append max-min sd per year        
+        
     # gumbel function
     def gumbel_r_mom(x):
         """
@@ -323,6 +347,7 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
 
     # calculate gumbel parameters
     loc1, scale1 = gumbel_r_mom(Sd_maxmin_rz_year)
+    # loc1, scale1 = gumbel_r_mom(Sd_maxmin)
 
     # find Sd value corresponding with return period
     Sd_T = []
@@ -441,7 +466,39 @@ def merge_sr_catchments(sr_dir,out_dir):
     frame.to_csv(f'{out_dir}/sr_all_catchments.csv')
     
     return frame
+
+## 7
+def merge_sr_catchments_maxmin(sr_dir,out_dir):
+    """
+    merge sr from individual catchments into one dataframe
     
+    sr_dir:   str, dir, directory with sr csvs for all catchments
+    out_dir:  str, dir, output directory for table
+    
+    returns: df with sr of all catchments, stores csv with sr of all catchments
+    
+    """
+    # get all sr files
+    all_files = glob.glob(f'{sr_dir}/*.csv')
+    
+    # make empty list
+    li = []
+
+    # loop over sr files
+    for filename in all_files:
+        df = pd.read_csv(filename, index_col=None, header=0)
+        li.append(df)
+    
+    # merge files and store as csv
+    frame = pd.concat(li, axis=0)
+    frame = frame.rename(columns={'Unnamed: 0':'catch_id'})
+    frame.index = frame['catch_id']
+    frame = frame.drop(columns={'catch_id'})
+    frame.to_csv(f'{out_dir}/sr_all_catchments_maxmin.csv')
+    
+    return frame
+    
+
 ## 7
 def plot_sr(shp_file, sr_file, rp):
     """
