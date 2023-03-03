@@ -197,7 +197,7 @@ def idu_mean(df):
             interstorm.append(count)
             count = 0 
     if (len(interstorm))>0:
-        idu_mean = int(np.mean(interstorm))
+        idu_mean = np.round(np.mean(interstorm),2)
     else:
         idu_mean=0     
     return idu_mean
@@ -227,7 +227,7 @@ def idu_max(df):
             a.append(max(interstorm))
         else:
             a.append(0)
-    idu_max = int(np.mean(a))
+    idu_max = np.round(np.mean(a),2)
 
     return idu_max
 
@@ -249,7 +249,7 @@ def hpd_mean(df):
             high_p.append(count)
             count = 0 
     if (len(high_p))>0:
-        hpd_mean = int(np.mean(high_p))
+        hpd_mean = np.round(np.mean(high_p),2)
     else:
         hpd_mean=0        
     return hpd_mean
@@ -280,7 +280,7 @@ def hpd_max(df):
             a.append(max(high_p))
         else:
             a.append(0)
-    hpd_max = int(np.mean(a))
+    hpd_max = np.round(np.mean(a),2)
     return hpd_max
 
 def hpf(df):

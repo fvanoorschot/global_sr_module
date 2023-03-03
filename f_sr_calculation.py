@@ -28,7 +28,7 @@ from pathos.threading import ThreadPool as Pool
 
 
 ## 1
-def sd_initial(df, si_0, si_max, q_mean):
+def sd_initial(df, si_0, si_max, q_mean,s):
     """
     calculate timeseries of storage deficits
 
@@ -45,10 +45,10 @@ def sd_initial(df, si_0, si_max, q_mean):
     # add year if the start date is earlier than the timeseries (e.g. startdate 02-01, timeseries starts 02-28) 
     if df.index[0]>df.date_start[0]:
         df.date_start = df.date_start[0] + relativedelta(years=1)
-    
+
     # select time period of interest
     df = df.loc[df.date_start[0]:df.date_end[0]]
-    
+
     # add empty columns for interception storage calculation
     df.loc[:,'Si_1'] = np.nan
     df.loc[:,'Pe'] = np.nan
@@ -57,41 +57,68 @@ def sd_initial(df, si_0, si_max, q_mean):
     df.loc[:,'Si_3'] = np.nan
     df.loc[:,'Et'] = np.nan
     df.loc[:,'Sd'] = np.nan
-    
+
     # convert to numpy arrays (to speed up calculations)
     p = np.array(df.p.values)
     ep = np.array(df.ep.values)
-    
+
+    if (s==1):
+        pl = np.array(df.pl.values)
+        pm = np.array(df.pm.values)
+
     si1 = np.zeros(len(df))
     pe = np.zeros(len(df))
+    pef = np.zeros(len(df))
     si2 = np.zeros(len(df))
     ei = np.zeros(len(df))
     si3 = np.zeros(len(df))
     et = np.zeros(len(df))
     sd = np.zeros(len(df))
-    
-    #calculate interception storage and effective precipitation for all timesteps
-    for l in range(1,len(si1)):
-        # first timestep l=0
-        si1[0] = p[0] + si_0
-        pe[0] = max(0,si1[0]-si_max)
-        si2[0] = si1[0] - pe[0]
-        ei[0] = min(si2[0],ep[0])
-        si3[0] = si2[0] - ei[0]
-    
-        # timestep 1 to end
-        si1[l] = p[l] + si3[l-1]
-        pe[l] = max(0,si1[l]-si_max)
-        si2[l] = si1[l] - pe[l]
-        ei[l] = min(si2[l],ep[l])
-        si3[l] = si2[l] - ei[l]
-    
+
+    if (s==1): # snow
+        #calculate interception storage and effective precipitation for all timesteps
+        for l in range(1,len(si1)):
+            # first timestep l=0
+            si1[0] = pl[0] + si_0
+            pef[0] = max(0,si1[0]-si_max)
+            si2[0] = si1[0] - pef[0]
+            ei[0] = min(si2[0],ep[0])
+            si3[0] = max(0,si2[0]-ei[0])
+
+            pe[0] = pef[0]+pm[0]
+
+            # timestep 1 to end
+            si1[l] = pl[l] + si3[l-1]
+            pef[l] = max(0,si1[l]-si_max)
+            si2[l] = si1[l] - pef[l]
+            ei[l] = min(si2[l],ep[l])
+            si3[l] = max(0,si2[l]-ei[l])
+
+            pe[l] = pef[l]+pm[l]
+
+    else: # no snow
+        #calculate interception storage and effective precipitation for all timesteps
+        for l in range(1,len(si1)):
+            # first timestep l=0
+            si1[0] = p[0] + si_0
+            pe[0] = max(0,si1[0]-si_max)
+            si2[0] = si1[0] - pe[0]
+            ei[0] = min(si2[0],ep[0])
+            si3[0] = max(0,si2[0]-ei[0])
+
+            # timestep 1 to end
+            si1[l] = p[l] + si3[l-1]
+            pe[l] = max(0,si1[l]-si_max)
+            si2[l] = si1[l] - pe[l]
+            ei[l] = min(si2[l],ep[l])
+            si3[l] = max(0,si2[l]-ei[l])
+
     #calculate Et from the catchment water balance (Et = Pe-Q)
     Pe_mean = np.mean(pe)
     EP_mean = np.mean(ep)
     Q_mean = q_mean #q_mean from other file than p and e because yearly timeseries
     Et_mean = Pe_mean - Q_mean
-    
+
     #check if water balance is ok
     if Et_mean<0: # if this is the case, it is not possible to calculate sd
         b = 1 # wb not ok
@@ -124,7 +151,7 @@ def sd_initial(df, si_0, si_max, q_mean):
     return b, df
 
 ## 2
-def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
+def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir):
     """
     run calculation of storage deficits (1)
     
@@ -136,8 +163,16 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
     returns: out:sd timeseries, stores out dataframe (Sd calculation) as csv
     """
     
-    # get P Ep and Q files for catch id
-    f_pep = glob.glob(f'{pep_dir}/{catch_id}*.csv')
+    if catch_id in snow_id_list:
+        s = 1 # snow is yes
+        f_pep = glob.glob(f'{snow_dir}/{catch_id}*.csv')
+
+    else:
+        s = 0 # snow is no
+        # get P Ep and Q files for catch id
+        f_pep = glob.glob(f'{pep_dir}/{catch_id}*.csv')
+
+    # read q df
     f_q = glob.glob(f'{q_dir}/{catch_id}*.csv')
 
     # read files as dataframes
@@ -146,16 +181,30 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
     pep_ts = pd.read_csv(f_pep[0],index_col=0)
     pep_ts.index = pd.to_datetime(pep_ts.index)
 
-    # convert to monthly dataframes
-    df_monthly = pd.DataFrame(index=pd.date_range(pep_ts.index[0],pep_ts.index[-1],freq='M'), columns=['p','ep'])
-    df_monthly[['p','ep']] = pep_ts[['p','ep']].groupby(pd.Grouper(freq="M")).sum()
+    if (s==1): #snow
+        # convert to monthly dataframes
+        df_monthly = pd.DataFrame(index=pd.date_range(pep_ts.index[0],pep_ts.index[-1],freq='M'), columns=['p','ep','ps','pm','pl'])
+        df_monthly[['p','ep','ps','pm','pl']] = pep_ts[['p','ep','ps','pm','pl']].groupby(pd.Grouper(freq="M")).sum()
 
-    # calculate start hydroyear -> month after on average the wettest month
-    df_monthly_mean = df_monthly.groupby([df_monthly.index.month]).mean()
-    wettest_month = (df_monthly_mean['p']-df_monthly_mean['ep']).idxmax()
-    hydro_year_start_month = wettest_month+1
-    if hydro_year_start_month==13:
-        hydro_year_start_month=1
+        # calculate start hydroyear -> month after on average the wettest month
+        df_monthly_mean = df_monthly.groupby([df_monthly.index.month]).mean()
+        df_monthly_mean['liq'] = df_monthly_mean['pm'] + df_monthly_mean['pl']
+        wettest_month = (df_monthly_mean['liq']-df_monthly_mean['ep']).idxmax()
+        hydro_year_start_month = wettest_month+1
+        if hydro_year_start_month==13:
+            hydro_year_start_month=1
+
+    else: # no snow
+        # convert to monthly dataframes
+        df_monthly = pd.DataFrame(index=pd.date_range(pep_ts.index[0],pep_ts.index[-1],freq='M'), columns=['p','ep'])
+        df_monthly[['p','ep']] = pep_ts[['p','ep']].groupby(pd.Grouper(freq="M")).sum()
+
+        # calculate start hydroyear -> month after on average the wettest month
+        df_monthly_mean = df_monthly.groupby([df_monthly.index.month]).mean()
+        wettest_month = (df_monthly_mean['p']-df_monthly_mean['ep']).idxmax()
+        hydro_year_start_month = wettest_month+1
+        if hydro_year_start_month==13:
+            hydro_year_start_month=1
 
     # find the start and end date for the sr calculation based on P, Ep, Q timeseries and hydroyear
     p_ep_start_year = pep_ts.index.year[0]
@@ -179,18 +228,27 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir):
         #calculate mean Q for startdate enddate timeseries
         q_mean = q_ts.loc[start_date:end_date,'Q'].mean()
 
-        # prepare input dataframe for sd calculation
-        sd_input = pd.DataFrame(index=pd.date_range(start_date,end_date,freq='d'), columns=['p','ep','date_start','date_end'])
-        sd_input[['p','ep']] = pep_ts[['p','ep']]
-        sd_input[['date_start','date_end']] = start_date, end_date
-        si_0 = 0 #initial interception storage
-        si_max = 2.5 #maximum interception storage
+        if (s==1): # snow
+            # prepare input dataframe for sd calculation
+            sd_input = pd.DataFrame(index=pd.date_range(start_date,end_date,freq='d'), columns=['p','ep','ps','pm','pl','date_start','date_end'])
+            sd_input[['p','ep','ps','pm','pl']] = pep_ts[['p','ep','ps','pm','pl']]
+            sd_input[['date_start','date_end']] = start_date, end_date
+            si_0 = 0 #initial interception storage
+            si_max = 2.5 #maximum interception storage
+
+        else: # no snow
+            # prepare input dataframe for sd calculation
+            sd_input = pd.DataFrame(index=pd.date_range(start_date,end_date,freq='d'), columns=['p','ep','date_start','date_end'])
+            sd_input[['p','ep']] = pep_ts[['p','ep']]
+            sd_input[['date_start','date_end']] = start_date, end_date
+            si_0 = 0 #initial interception storage
+            si_max = 2.5 #maximum interception storage
 
         # run sd calculation
-        b = sd_initial(sd_input, si_0, si_max, q_mean)[0] #b==0: closing wb, b==1: non-closing wb > no sd calculation
+        b = sd_initial(sd_input, si_0, si_max, q_mean,s)[0] #b==0: closing wb, b==1: non-closing wb > no sd calculation
         if b==0:      
             # save output dataframe from sd calculation
-            out = sd_initial(sd_input, si_0, si_max, q_mean)[1]
+            out = sd_initial(sd_input, si_0, si_max, q_mean,s)[1]
             out.to_csv(f'{out_dir}/{catch_id}.csv')
             return out
         
@@ -200,6 +258,8 @@ def run_sd_calculation_parallel(
     pep_dir_list=list,
     q_dir_list=list,
     out_dir_list=list,
+    snow_id_list=list,
+    snow_dir_list=list,
     # threads=None
     threads=200
 ):
@@ -210,6 +270,8 @@ def run_sd_calculation_parallel(
     pep_dir_list:     str, list, list of input folders for pep forcing data
     q_dir_list:   str, list, list of folder with q timeseries
     output_dir_list: str, list, list of output directories
+    snow_id_list: str,list, list of catchments with snow
+    snow_dir_list: str, list, list of snow timeseries directory
     threads:         int,       number of threads (cores), when set to None use all available threads
 
     Returns: None
@@ -226,6 +288,8 @@ def run_sd_calculation_parallel(
         pep_dir_list,
         q_dir_list,
         out_dir_list,
+        snow_id_list,
+        snow_dir_list
     )
 
     # return results
@@ -346,8 +410,8 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
         return loc, scale    
 
     # calculate gumbel parameters
-    loc1, scale1 = gumbel_r_mom(Sd_maxmin_rz_year)
-    # loc1, scale1 = gumbel_r_mom(Sd_maxmin)
+    # loc1, scale1 = gumbel_r_mom(Sd_maxmin_rz_year)
+    loc1, scale1 = gumbel_r_mom(Sd_maxmin)
 
     # find Sd value corresponding with return period
     Sd_T = []
@@ -389,15 +453,16 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir):
         if(date_end=='2-29'):
             date_end='2-28'
         
-        # calculate sr for different return periods using (4)
-        sr_T = sr_return_periods_minmax_rzyear(rp_array, Sd, year_start, year_end, date_start, date_end)
-        
-        # store dataframe with catchment sr values
-        sr_df = pd.DataFrame(index=[catch_id], columns=rp_array)
-        sr_df.loc[catch_id]=sr_T
-        sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
-        
-        return(sr_df)
+        if (year_end-year_start)>10:#only if our timeseries is longer than 10years
+            # calculate sr for different return periods using (4)
+            sr_T = sr_return_periods_minmax_rzyear(rp_array, Sd, year_start, year_end, date_start, date_end)
+
+            # store dataframe with catchment sr values
+            sr_df = pd.DataFrame(index=[catch_id], columns=rp_array)
+            sr_df.loc[catch_id]=sr_T
+            sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
+
+            return(sr_df)
 
     
 ## 3

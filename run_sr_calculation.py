@@ -39,11 +39,28 @@ print(data_dir)
 pep_dir = f'{work_dir}/output/forcing_timeseries/processed/daily'
 q_dir = f'{work_dir}/output/q_timeseries_selected'
 out_dir = f'{work_dir}/output/sr_calculation/sd_catchments'
+snow_ids = np.genfromtxt(f'{work_dir}/output/snow/catch_id_list_snow_t_and_p.txt',dtype='str')
+snow_dir = f'{work_dir}/output/snow/timeseries'
 
-c = np.loadtxt(f'{work_dir}/output/sr_calculation/sd_list.txt',dtype=str) 
+c = np.loadtxt(f'{work_dir}/output/gsim_aus_catch_id_list_lo_sel_area_wb.txt',dtype=str) 
 catch_id_list = c[:]
 pep_dir_list = [pep_dir] * len(catch_id_list)
 q_dir_list = [q_dir] * len(catch_id_list)
 out_dir_list = [out_dir] * len(catch_id_list)
+snow_id_list = [snow_ids] * len(catch_id_list)
+snow_dir_list = [snow_dir] * len(catch_id_list)
 
-run_sd_calculation_parallel(catch_id_list,pep_dir_list,q_dir_list,out_dir_list)
+run_sd_calculation_parallel(catch_id_list,pep_dir_list,q_dir_list,out_dir_list,snow_id_list,snow_dir_list)
+
+# # define directories
+# pep_dir = f'{work_dir}/output/forcing_timeseries/processed/daily'
+# q_dir = f'{work_dir}/output/q_timeseries_selected'
+# out_dir = f'{work_dir}/output/sr_calculation/sd_catchments'
+
+# c = np.loadtxt(f'{work_dir}/output/sr_calculation/sd_list.txt',dtype=str) 
+# catch_id_list = c[:]
+# pep_dir_list = [pep_dir] * len(catch_id_list)
+# q_dir_list = [q_dir] * len(catch_id_list)
+# out_dir_list = [out_dir] * len(catch_id_list)
+
+# run_sd_calculation_parallel(catch_id_list,pep_dir_list,q_dir_list,out_dir_list)

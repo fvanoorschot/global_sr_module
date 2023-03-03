@@ -144,7 +144,8 @@ def area_weighted_shapefile_rasterstats(
             var='Ep'
         if (catchment_netcdf.split('/')[-1].split('_')[0] == 'tas'): #tas is gswp mean daily temperature
             var='T'
-
+        if (catchment_netcdf.split('/')[-1].split('_')[0] == 'pre'): #pre is cru monthly precipitation
+            var='P'
         # Write csv as output
         df.to_csv(f"{output_dir}/{Path(catchment_shapefile).name.split('.')[0]}_{var}_{statistical_operator}_{y_start}_{y_end}.csv")
        
@@ -330,4 +331,186 @@ def run_processing_function_parallel(
         fol_in_list,
         fol_out_list,
         var_list,
+    )
+    
+    
+## grid to catchments for cru precipitation
+def area_weighted_shapefile_rasterstats_cru(
+    catchment_shapefile,
+    catchment_netcdf,
+    statistical_operator,
+    output_dir,
+    output_csv=True,
+    return_cube=False,
+    regrid_first=True,
+    grid_resolution=0.1
+):
+    
+    """
+    Calculate area weighted zonal statistics of netcdfs using a shapefile to extract netcdf data.
+
+    catchment_shapefile:  str, catchment shapefile
+    catchment_netcdf:     str, netcdf file
+    statistical_operator: str, (mean, median (NOT area weighted), sum, variance, min, max, rms)
+    - https://docs.esmvaltool.org/projects/esmvalcore/en/latest/api/esmvalcore.preprocessor.html#esmvalcore.preprocessor.area_statistics
+    output_csv:          bool, True stores csv output and False stores netcdf output
+    regrid_first:        bool, True regrid cube first before extracting shape, False do not regrid first
+    grid_resolution:    float, grid cell size of target cube in degrees
+    Returns: iris cube, stores .csv file or .nc file
+    """
+
+    # Load iris cube of netcdf
+    cube = iris.load_cube(catchment_netcdf)
+    cube.dim_coords[1].guess_bounds()
+    cube.dim_coords[2].guess_bounds()
+
+    # extract dates of netcdf timeseries to be used as filename
+    time_start,time_end = cube.coord('time')[0],cube.coord('time')[-1]
+    point_start, point_end = time_start.points, time_end.points
+    unit = time_start.units
+    l = unit.num2date(0)
+    d = datetime(year=l.year, month=l.month, day=l.day)
+    date_start, date_end = d + timedelta(days=int(point_start[0])), d + timedelta(days=int(point_end[0]))
+    y_start, y_end = date_start.year, date_end.year
+
+    # Create target grid and regrid cube
+    if regrid_first is True:
+        target_cube = regridding_target_cube(catchment_shapefile, grid_resolution, buffer=1) #create the regrid target cube
+        # cube = preprocessor.regrid(cube, target_cube, scheme="area_weighted") #regrid the netcdf file (conservative) to a higher resolution
+        cube = preprocessor.regrid(cube, target_cube, scheme="nearest") #regrid the netcdf file (nearest neighbour) to a higher resolution
+
+    # From cube extract shapefile shape
+    cube = preprocessor.extract_shape(cube, catchment_shapefile, method="contains") #use all grid cells that lie >50% inside the catchment shape
+
+    # Calculate area weighted statistics of extracted grid cells (inside catchment shape)
+    cube_stats = preprocessor.area_statistics(cube, statistical_operator)
+
+    if output_csv is True: #save the timeseries as csv
+        # Convert cube to dataframe
+        df = iris.pandas.as_data_frame(cube_stats)
+
+        # Change column names of timeseries dataframe
+        df = df.reset_index()
+        df = df.set_axis(["time", cube_stats.name()], axis=1)
+
+        dates = pd.date_range(date_start,date_end + timedelta(days=31),freq='M')
+        df.index = dates
+        df = df.drop(columns='time')
+        df.precipitation = df.precipitation/df.index.days_in_month
+
+        var=0
+        if (catchment_netcdf.split('/')[-1].split('_')[0] == 'pr'): #pr is gswp daily precipitation
+            var='P'
+        if (catchment_netcdf.split('/')[-1].split('_')[0] == 'Ep'): #Ep is GLEAM potential evaporation
+            var='Ep'
+        if (catchment_netcdf.split('/')[-1].split('_')[0] == 'tas'): #tas is gswp mean daily temperature
+            var='T'
+        if (catchment_netcdf.split('/')[-1].split('_')[0] == 'pre'): #pre is cru monthly precipitation
+            var='P'
+        # Write csv as output
+        df.to_csv(f"{output_dir}/{Path(catchment_shapefile).name.split('.')[0]}_{var}_{statistical_operator}_{y_start}_{y_end}.csv")
+
+#     # if output_csv is False -> save the netcdf cube
+#     else:
+#         iris.save(cube_stats, f"{output_dir}/{Path(catchment_shapefile).name.split('.')[0]}_{var}_{statistical_operator}_{y_start}_{y_end}.nc")
+
+#     # return cube yes or no
+#     if return_cube == True:
+#         return cube
+#     else:
+#         return
+    
+## 4
+def run_cru_function_parallel(
+    shapefile_list=list,
+    netcdf_list=list,
+    operator_list=list,
+    output_dir_list=list,
+    threads=None
+    #threads=100
+):
+    """
+    Runs function area_weighted_shapefile_rasterstats cru in parallel.
+
+    shapefile_list:  str, list, list of input catchment shapefiles
+    netcdf_list:     str, list, list of input netcdf files
+    operator_list:   str, list, list of statistical operators (single operator)
+    output_dir_list: str, list, list of output directories
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        area_weighted_shapefile_rasterstats_cru,
+        shapefile_list,
+        netcdf_list,
+        operator_list,
+        output_dir_list,
+    )
+
+    return results
+
+
+def process_cru_timeseries(catch_id,work_dir,regrid_type):
+    # make empty dataframe
+    d = pd.DataFrame()
+
+    # for j in variable list - list the timeseries csvs for the catch id
+    l = glob.glob(f'{work_dir}/output/forcing_timeseries/cru_p/{regrid_type}/raw/{catch_id}*.csv')
+    df = pd.read_csv(l[0], index_col=0, header=0)
+    d = df
+    d = d.rename(columns={'precipitation':'p'})
+    d.index = pd.to_datetime(d.index)
+
+    fol_out = f'{work_dir}/output/forcing_timeseries/cru_p/{regrid_type}/processed'
+    # get monthly timeseries and store as csv
+    if not os.path.exists(f'{fol_out}/monthly'):
+         os.makedirs(f'{fol_out}/monthly')
+    df_m = d.groupby(pd.Grouper(freq='M')).mean()
+    y_start,y_end = df_m.index[0].year, df_m.index[-1].year
+    df_m.to_csv(f'{fol_out}/monthly/{catch_id}_{y_start}_{y_end}.csv')    
+
+    # get climatology and store as csv
+    if not os.path.exists(f'{fol_out}/climatology'):
+         os.makedirs(f'{fol_out}/climatology')
+    df_m = df_m.groupby([df_m.index.month]).mean()
+    df_m.to_csv(f'{fol_out}/climatology/{catch_id}_{y_start}_{y_end}.csv')
+
+    # get yearly timeseries and store as csv
+    if not os.path.exists(f'{fol_out}/yearly'):
+         os.makedirs(f'{fol_out}/yearly')
+    df_y = d.groupby(pd.Grouper(freq='Y')).mean()
+    y_start,y_end = df_y.index[0].year, df_y.index[-1].year
+    df_y.to_csv(f'{fol_out}/yearly/{catch_id}_{y_start}_{y_end}.csv')
+
+    # get mean of timeseries and store as csv
+    if not os.path.exists(f'{fol_out}/mean'):
+         os.makedirs(f'{fol_out}/mean')
+    dm = d.mean()
+    dm.to_csv(f'{fol_out}/mean/{catch_id}_{y_start}_{y_end}.csv')
+    
+def run_cru_processing_function_parallel(
+    catch_list=list,
+    work_dir_list=list,
+    regrid_type_list=list,
+    # threads=None
+    threads=100
+):
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        process_cru_timeseries,
+        catch_list,
+        work_dir_list,
+        regrid_type_list,
     )

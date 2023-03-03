@@ -1,0 +1,42 @@
+import glob
+from pathlib import Path
+import os
+import geopandas as gpd
+import iris
+import iris.pandas
+import numpy as np
+from esmvalcore import preprocessor
+from iris.coords import DimCoord
+from iris.cube import Cube
+from pathos.threading import ThreadPool as Pool
+from datetime import datetime
+from datetime import timedelta
+import pandas as pd
+
+from f_grid_to_catchments import *
+
+work_dir=Path('/scratch/fransjevanoors/global_sr')
+#work_dir=Path('/tudelft.net/staff-umbrella/LSM root zone/global_sr')
+data_dir=Path(f'{work_dir}/data')
+out_dir = Path(f"{work_dir}/output")
+
+print(work_dir)
+print(out_dir)
+print(data_dir)
+
+
+# define directories 
+nc_cru = f'{work_dir}/data/cru_p/cru_ts4.06_1961_2010_pre.nc' # dir of netcdf forcing files
+out_dir = f'{work_dir}/output/forcing_timeseries/cru_p/nearest_neighbour' # output dir
+operator = 'mean'
+
+shape_dir = Path(f'{work_dir}/output/selected_shapes/')
+shapefile_list = glob.glob(f'{shape_dir}/*.shp')[:]
+
+netcdf_list = [nc_cru]*len(shapefile_list)
+output_dir_list = [out_dir]*len(shapefile_list)
+operator_list = [operator]*len(shapefile_list)
+
+
+# run function parallel
+run_cru_function_parallel(shapefile_list, netcdf_list, operator_list, output_dir_list)
