@@ -488,18 +488,20 @@ def seas_var_indices(df):
     return de,dp,dt,sp,st,se,sd,sti
 
 
-def catch_characteristics_climate(var_cl, catch_id,work_dir):
+def catch_characteristics_climate(var_cl, catch_id,work_dir,data_sources):
     """
     calculate catchment characteristics - climate variables
     var_cl: define list of climate variables
     catch_id: catchment id
+    data_sources: combination of data used for P, Ep and T (gswp-p_gleam-ep_gswp-t for example)
     returns: dataframe with climate variables for catchment
     """
     cc_cl = pd.DataFrame(index=[catch_id], columns=var_cl)
     j = catch_id
-    l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
-    df = pd.read_csv(l[0], index_col=0)
-    df.index = pd.to_datetime(df.index)
+    if (data_sources=='gswp-p_gleam-ep_gswp-t'):
+        l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
+        df = pd.read_csv(l[0], index_col=0)
+        df.index = pd.to_datetime(df.index)
 
     l_q = glob.glob(f'{work_dir}/output/q_timeseries_selected/{j}*.csv') # find discharge data for catchment
     df_q = pd.read_csv(l_q[0], index_col=0)
@@ -569,9 +571,6 @@ def catch_characteristics_landscape(var_lc,catch_id,work_dir):
     """
     cc_lc = pd.DataFrame(index=[catch_id], columns=var_lc)
     j = catch_id
-    l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
-    df = pd.read_csv(l[0], index_col=0)
-    df.index = pd.to_datetime(df.index)
 
     if 'tc' in var_lc:
         dft = pd.read_csv(f'{work_dir}/output/treecover/gsim_shapes_treecover.csv',index_col=0) #find treecover tables for catchment
@@ -582,36 +581,135 @@ def catch_characteristics_landscape(var_lc,catch_id,work_dir):
     if 'area' in var_lc:
         a = pd.read_csv(f'{work_dir}/output/catchment_area.csv',index_col=0)
         cc_lc.loc[j,'area'] = a.loc[j,'area']
+        
+    if 'el_mean' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/elevation/stats_hydrosheds/ele_{j}.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'el_mean'] = e.loc[j,'mean_ele']
+        cc_lc.loc[j,'el_max'] = e.loc[j,'max_ele']
+        cc_lc.loc[j,'el_min'] = e.loc[j,'min_ele']
+        cc_lc.loc[j,'el_std'] = e.loc[j,'std_ele']
+    if 'slp_mean' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/elevation/stats_hydrosheds/slope_{j}.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'slp_mean'] = e.loc[j,'mean_slope']
+        cc_lc.loc[j,'slp_max'] = e.loc[j,'max_slope']
+        cc_lc.loc[j,'slp_min'] = e.loc[j,'min_slope']
+        cc_lc.loc[j,'slp_std'] = e.loc[j,'std_slope']
 
     # add gsim variables
-    gsim_var=['ir.mean','ele.mean','ele.min','ele.max','dr.mean','slp.mean','scl.mean','snd.mean','slt.mean','tp.mean']
+    gsim_var=['ir.mean','dr.mean','scl.mean','snd.mean','slt.mean','tp.mean']
     df_gsim = pd.read_csv(f'{work_dir}/data/GSIM_data/GSIM_metadata/GSIM_catalog/GSIM_catchment_characteristics.csv',index_col=0)
     k = j.upper()
     if k in df_gsim.index.values:
-        cc_lc.loc[j,['ir_mean','el_mean','el_min','el_max','drd','slp_mean','cla','snd','slt','tpi']] = df_gsim.loc[k,gsim_var].values
+        cc_lc.loc[j,['ir_mean','drd','cla','snd','slt','tpi']] = df_gsim.loc[k,gsim_var].values
     else:
         # use aus information
         df_aus = pd.read_csv(f'{work_dir}/data/CAMELS_AUS/CAMELS_AUS_Attributes-Indices_MasterTable.csv',index_col=0)
-        cc_lc.loc[j,['el_mean','el_min','el_max','drd','slp_mean','cla','snd']] = df_aus.loc[j,['elev_mean','elev_min','elev_max','strdensity','mean_slope_pct','claya','sanda']].values  
+        cc_lc.loc[j,['drd','cla','snd']] = df_aus.loc[j,['strdensity','claya','sanda']].values  
         cc_lc.loc[j,['ir_mean','slt','tpi']] = np.nan # not available for camels aus    
     return cc_lc
 
-def catch_characteristics(var_lc,var_cl, catch_id, work_dir):
+def catch_characteristics_climate_snow(var_sn, catch_id,work_dir,data_sources):
+    """
+    calculate catchment characteristics - climate variables using liquid input for snow catchments
+    var_snow: define list of snow-climate variables
+    catch_id: catchment id
+    data_sources: combination of data used for P, Ep and T (gswp-p_gleam-ep_gswp-t for example)
+    returns: dataframe with snow-climate variables for catchment
+    """
+    snow_list=np.genfromtxt(f'{work_dir}/output/snow/catch_id_list_snow_t_and_p.txt',dtype='str')
+    cc_sn = pd.DataFrame(index=[catch_id], columns=var_sn)
+    j = catch_id
+    if (data_sources=='gswp-p_gleam-ep_gswp-t'):
+        pdata='gswp'
+        if j in snow_list: # if snow, use liquid input instead of p
+            l = glob.glob(f'{work_dir}/output/snow/timeseries_{pdata}/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment liquid input
+            df = pd.read_csv(l[0], index_col=0)
+            df.index = pd.to_datetime(df.index)
+
+            # set df p column to df pl 
+            df['p']=df['pl']
+
+            # calculate catchment characteristics using functions in (1)
+            if 'si_pl' in var_sn:
+                cc_sn.loc[j,'si_pl'] = si_p(df) 
+
+            if 'phi_l' in var_sn:
+                cc_sn.loc[j,'phi_l'] = phi(df)
+
+            if 'idu_mean_l' in var_sn:
+                cc_sn.loc[j,'idu_mean_l'] = idu_mean(df)
+            if 'idu_max_l' in var_sn:
+                cc_sn.loc[j,'idu_max_l'] = idu_max(df)
+
+            if 'hpd_mean_l' in var_sn:
+                cc_sn.loc[j,'hpd_mean_l'] = hpd_mean(df)
+            if 'hpd_max_l' in var_sn:
+                cc_sn.loc[j,'hpd_max_l'] = hpd_max(df)
+
+            if 'hpf_l' in var_sn:
+                cc_sn.loc[j,'hpf_l'] = hpf(df)
+            if 'lpf_l' in var_sn:
+                cc_sn.loc[j,'lpf_l'] = lpf(df)
+
+            if 'sti_l' in var_sn:
+                cc_sn.loc[j,['de_l','dp_l','dt_l','sp_l','st_l','se_l','sd_l','sti_l']] = seas_var_indices(df)
+
+        else: # if no snow, then liquid p variables same as normal p variables
+            l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
+            df = pd.read_csv(l[0], index_col=0)
+            df.index = pd.to_datetime(df.index)
+
+            # calculate catchment characteristics using functions in (1)
+            if 'si_pl' in var_sn:
+                cc_sn.loc[j,'si_pl'] = si_p(df) 
+
+            if 'phi_l' in var_sn:
+                cc_sn.loc[j,'phi_l'] = phi(df)
+
+            if 'idu_mean_l' in var_sn:
+                cc_sn.loc[j,'idu_mean_l'] = idu_mean(df)
+            if 'idu_max_l' in var_sn:
+                cc_sn.loc[j,'idu_max_l'] = idu_max(df)
+
+            if 'hpd_mean_l' in var_sn:
+                cc_sn.loc[j,'hpd_mean_l'] = hpd_mean(df)
+            if 'hpd_max_l' in var_sn:
+                cc_sn.loc[j,'hpd_max_l'] = hpd_max(df)
+
+            if 'hpf_l' in var_sn:
+                cc_sn.loc[j,'hpf_l'] = hpf(df)
+            if 'lpf_l' in var_sn:
+                cc_sn.loc[j,'lpf_l'] = lpf(df)
+
+            if 'sti_l' in var_sn:
+                cc_sn.loc[j,['de_l','dp_l','dt_l','sp_l','st_l','se_l','sd_l','sti_l']] = seas_var_indices(df)
+        
+    return cc_sn
+
+def catch_characteristics(var_lc,var_cl,var_sn, catch_id, work_dir,data_sources):
     """
     combine climate and landscape variables in one dataframe
     returns: catchment characteristics dataframe cc - saved as csv file
     """
+    # if not os.path.exists(f'{work_dir}/output/catchment_characteristics/{data_sources}/'):
+    #     os.makedirs(f'{work_dir}/output/catchment_characteristics/{data_sources}/')
+    
     cc_lc = catch_characteristics_landscape(var_lc,catch_id,work_dir)
-    cc_cl = catch_characteristics_climate(var_cl, catch_id,work_dir)
-    cc = pd.concat([cc_cl,cc_lc],axis=1)
-    cc.to_csv(f'{work_dir}/output/catchment_characteristics/{catch_id}.csv') #store cc dataframe
+    cc_cl = catch_characteristics_climate(var_cl, catch_id,work_dir,data_sources)
+    cc_sn = catch_characteristics_climate_snow(var_sn, catch_id,work_dir,data_sources)
+    cc = pd.concat([cc_cl,cc_sn,cc_lc],axis=1)
+    cc.to_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/{catch_id}.csv') #store cc dataframe
     
 
 def run_function_parallel_catch_characteristics(
     var_lc_list=list,
     var_cl_list=list,
+    var_sn_list=list,
     catch_list=list,
     work_dir_list=list,
+    data_sources_list=list,
     # threads=None
     threads=100
     ):
@@ -620,8 +718,10 @@ def run_function_parallel_catch_characteristics(
 
     var_cl_list: str,list, list of climate variables
     var_lc_list: str,list, list of landscape variables
+    var_sn_list: str,list, list of climate snow variables
     catch_list:  str, list, list of catchmet ids
     work_dir_list:     str, list, list of work dir
+    data_sources: combination of data used for P, Ep and T (gswp-p_gleam-ep_gswp-t for example)
     threads:         int,       number of threads (cores), when set to None use all available threads
 
     Returns: None
@@ -636,8 +736,10 @@ def run_function_parallel_catch_characteristics(
         catch_characteristics,
         var_lc_list,
         var_cl_list,
+        var_sn_list,
         catch_list,
         work_dir_list,
+        data_sources_list,
     )
     
 

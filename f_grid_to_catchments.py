@@ -111,11 +111,11 @@ def area_weighted_shapefile_rasterstats(
     
     # extract dates of netcdf timeseries to be used as filename
     time_start,time_end = cube.coord('time')[0],cube.coord('time')[-1]
-    point_start, point_end = time_start.points, time_end.points
+    point_start, point_end = np.float(time_start.points), np.float(time_end.points)
     unit = time_start.units
     l = unit.num2date(0)
     d = datetime(year=l.year, month=l.month, day=l.day)
-    date_start, date_end = d + timedelta(days=point_start[0]), d + timedelta(days=point_end[0])
+    date_start, date_end = d + timedelta(days=point_start), d + timedelta(days=point_end)
     y_start, y_end = date_start.year, date_end.year
     
     # Create target grid and regrid cube
@@ -145,6 +145,8 @@ def area_weighted_shapefile_rasterstats(
         if (catchment_netcdf.split('/')[-1].split('_')[0] == 'tas'): #tas is gswp mean daily temperature
             var='T'
         if (catchment_netcdf.split('/')[-1].split('_')[0] == 'pre'): #pre is cru monthly precipitation
+            var='P'
+        if (catchment_netcdf.split('/')[-1].split('_')[0] == 'precipitation'): #precipitation is mswep precipitation
             var='P'
         # Write csv as output
         df.to_csv(f"{output_dir}/{Path(catchment_shapefile).name.split('.')[0]}_{var}_{statistical_operator}_{y_start}_{y_end}.csv")
@@ -513,4 +515,241 @@ def run_cru_processing_function_parallel(
         catch_list,
         work_dir_list,
         regrid_type_list,
+    )
+    
+    
+# BEDROCK DEPTH
+def area_weighted_shapefile_rasterstats_bdepth(
+    catchment_shapefile,
+    catchment_netcdf,
+    output_dir,
+    output_csv=True,
+    return_cube=False,
+    regrid_first=True,
+    grid_resolution=0.1
+):
+    
+    # Load iris cube of netcdf
+    cube = iris.load_cube(catchment_netcdf)
+    cube.dim_coords[0].guess_bounds()
+    cube.dim_coords[1].guess_bounds()
+
+    catch_id = Path(catchment_shapefile).name.split('.')[0]
+
+    # From cube extract shapefile shape
+    cube = preprocessor.extract_shape(cube, catchment_shapefile, method="contains") #use all grid cells that lie >50% inside the catchment shape
+
+    # Calculate area weighted statistics of extracted grid cells (inside catchment shape)
+    cube_stats_mean = preprocessor.area_statistics(cube, 'mean')
+    cube_stats_max = preprocessor.area_statistics(cube, 'max')
+    cube_stats_min = preprocessor.area_statistics(cube, 'min')
+    cube_stats_std = preprocessor.area_statistics(cube, 'std_dev')
+
+    # Convert cube to dataframe
+    df = pd.DataFrame(index=[catch_id],columns=['bd_mean','bd_max','bd_min','bd_std'])
+    df['bd_mean']=cube_stats_mean.data/100
+    df['bd_min']=cube_stats_min.data/100
+    df['bd_max']=cube_stats_max.data/100
+    df['bd_std']=cube_stats_std.data/100
+
+    # Write csv as output
+    df.to_csv(f"{output_dir}/{Path(catchment_shapefile).name.split('.')[0]}.csv")
+    
+def area_weighted_shapefile_rasterstats_bdepth_perc(
+    catchment_shapefile,
+    catchment_netcdf,
+    output_dir,
+    output_csv=True,
+    return_cube=False,
+    regrid_first=True,
+    grid_resolution=0.1
+):
+    
+    # Load iris cube of netcdf
+    cube = iris.load_cube(catchment_netcdf)
+    cube.dim_coords[0].guess_bounds()
+    cube.dim_coords[1].guess_bounds()
+
+    catch_id = Path(catchment_shapefile).name.split('.')[0]
+
+    # From cube extract shapefile shape
+    cube = preprocessor.extract_shape(cube, catchment_shapefile, method="contains") #use all grid cells that lie >50% inside the catchment shape
+
+    b = cube.data
+    b = b.flatten()
+    b2 = b[~b.mask]
+    l = len(b2)
+    s = b2[b2<100]
+    bp = len(s)/l
+
+    # Convert cube to dataframe
+    df = pd.DataFrame(index=[catch_id],columns=['bd_perc'])
+    df['bd_perc']=bp
+
+    # Write csv as output
+    df.to_csv(f"{output_dir}/{Path(catchment_shapefile).name.split('.')[0]}.csv")
+    
+def run_bdepth_function_parallel(
+    shapefile_list=list,
+    netcdf_list=list,
+    output_dir_list=list,
+    threads=None
+    #threads=100
+):
+    """
+    Runs function area_weighted_shapefile_rasterstats cru in parallel.
+
+    shapefile_list:  str, list, list of input catchment shapefiles
+    netcdf_list:     str, list, list of input netcdf files
+    output_dir_list: str, list, list of output directories
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        area_weighted_shapefile_rasterstats_bdepth,
+        shapefile_list,
+        netcdf_list,
+        output_dir_list,
+    )
+
+def run_bdepth_perc_function_parallel(
+    shapefile_list=list,
+    netcdf_list=list,
+    output_dir_list=list,
+    threads=None
+    #threads=100
+):
+    """
+    Runs function area_weighted_shapefile_rasterstats cru in parallel.
+
+    shapefile_list:  str, list, list of input catchment shapefiles
+    netcdf_list:     str, list, list of input netcdf files
+    output_dir_list: str, list, list of output directories
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        area_weighted_shapefile_rasterstats_bdepth_perc,
+        shapefile_list,
+        netcdf_list,
+        output_dir_list,
+    )
+    
+    
+def area_weighted_shapefile_rasterstats_iwu(
+    catchment_shapefile,
+    catchment_netcdf,
+    output_dir,
+    output_csv=True,
+    return_cube=False,
+    regrid_first=True,
+    grid_resolution=0.1
+):
+    # Load iris cube of netcdf
+    cube = iris.load_cube(catchment_netcdf)
+    cube.dim_coords[1].guess_bounds()
+    cube.dim_coords[2].guess_bounds()
+
+    ts = pd.date_range('2011-01-01','2018-12-01',freq='MS')
+
+    # Create target grid and regrid cube
+    if regrid_first is True:
+        target_cube = regridding_target_cube(catchment_shapefile, grid_resolution, buffer=1) #create the regrid target cube
+        cube = preprocessor.regrid(cube, target_cube, scheme="area_weighted") #regrid the netcdf file (conservative) to a higher resolution
+
+    # From cube extract shapefile shape
+    cube = preprocessor.extract_shape(cube, catchment_shapefile, method="contains") #use all grid cells that lie >50% inside the catchment shape
+
+    # Calculate area weighted statistics of extracted grid cells (inside catchment shape)
+    cube_stats = preprocessor.area_statistics(cube, 'mean')
+
+    # Convert cube to dataframe
+    df = iris.pandas.as_data_frame(cube_stats)
+
+    # Change column names of timeseries dataframe
+    df = df.reset_index()
+    df = df.set_axis(["time", cube_stats.name()], axis=1)
+    df.index = ts
+    df = df.drop(columns=['time'])
+    df = df.rename(columns={'Irrigation_Water_Use_Ensemble':'iwu'})
+    # Write csv as output
+    df.to_csv(f"{output_dir}/{Path(catchment_shapefile).name.split('.')[0]}.csv")
+
+def run_iwu_function_parallel(
+    shapefile_list=list,
+    netcdf_list=list,
+    output_dir_list=list,
+    threads=None
+    #threads=100
+):
+    """
+    Runs function area_weighted_shapefile_rasterstats cru in parallel.
+
+    shapefile_list:  str, list, list of input catchment shapefiles
+    netcdf_list:     str, list, list of input netcdf files
+    output_dir_list: str, list, list of output directories
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        area_weighted_shapefile_rasterstats_iwu,
+        shapefile_list,
+        netcdf_list,
+        output_dir_list,
+    )
+    
+    
+def process_iwu_timeseries(catch_id,work_dir):
+    out_fol=f'{work_dir}/output/irrigation/raw/'
+    # load IWU dataframe
+    df = pd.read_csv(f'{out_fol}/{catch_id}.csv',index_col=0)
+    df.index = pd.to_datetime(df.index)
+    df['days_in_month']=df.index.days_in_month
+    df['iwu_mmday'] = df.iwu/df.days_in_month
+
+    df_m = df['iwu_mmday'].groupby([df.index.month]).mean()
+    df_mean = pd.DataFrame(index=[catch_id],columns=['iwu_mean_mmday'])
+    df_mean['iwu_mean_mmday'] = df_m.mean()
+
+    df_m.to_csv(f'{work_dir}/output/irrigation/processed/monthly_mean/{catch_id}.csv')
+    df_mean.to_csv(f'{work_dir}/output/irrigation/processed/mean/{catch_id}.csv')
+    
+    
+def run_iwu_processing_parallel(
+    catch_id_list=list,
+    work_dir_list=list,
+    threads=None
+    #threads=100
+):
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        process_iwu_timeseries,
+        catch_id_list,
+        work_dir_list,
     )
