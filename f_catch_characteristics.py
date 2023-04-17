@@ -596,18 +596,58 @@ def catch_characteristics_landscape(var_lc,catch_id,work_dir):
         cc_lc.loc[j,'slp_max'] = e.loc[j,'max_slope']
         cc_lc.loc[j,'slp_min'] = e.loc[j,'min_slope']
         cc_lc.loc[j,'slp_std'] = e.loc[j,'std_slope']
+    if 'iwu' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/irrigation/processed/mean/{j}.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'iwu'] = e.loc[j,'iwu_mean_mmday']
+    if 'bp' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/bedrock_depth/0_01deg/{j}.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'bp'] = e.loc[j,'bd_perc']
+    if 'dtb' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/bedrock_depth/0_05deg/{j}.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'dtb'] = e.loc[j,'bd_mean']
 
     # add gsim variables
-    gsim_var=['ir.mean','dr.mean','scl.mean','snd.mean','slt.mean','tp.mean']
     df_gsim = pd.read_csv(f'{work_dir}/data/GSIM_data/GSIM_metadata/GSIM_catalog/GSIM_catchment_characteristics.csv',index_col=0)
     k = j.upper()
     if k in df_gsim.index.values:
-        cc_lc.loc[j,['ir_mean','drd','cla','snd','slt','tpi']] = df_gsim.loc[k,gsim_var].values
+        if 'ir_mean' in var_lc:
+            cc_lc.loc[j,'ir_mean'] = df_gsim.loc[k,'ir.mean']
+        if 'drd' in var_lc:
+            cc_lc.loc[j,'drd'] = df_gsim.loc[k,'dr.mean']
+        if 'cla' in var_lc:
+            cc_lc.loc[j,'cla'] = df_gsim.loc[k,'scl.mean']
+        if 'snd' in var_lc:
+            cc_lc.loc[j,'snd'] = df_gsim.loc[k,'snd.mean']
+        if 'slt' in var_lc:
+            cc_lc.loc[j,'slt'] = df_gsim.loc[k,'slt.mean']
+        if 'tpi' in var_lc:
+            cc_lc.loc[j,'tpi'] = df_gsim.loc[k,'tp.mean']
+        if 'lc' in var_lc:
+            cc_lc.loc[j,'lc'] = df_gsim.loc[k,'landcover.type']
+        if 'lit' in var_lc:
+            cc_lc.loc[j,'lit'] = df_gsim.loc[k,'lithology.type']
+        if 'pop' in var_lc:
+            cc_lc.loc[j,'pop'] = df_gsim.loc[k,'pop.count']
+        if 'pd' in var_lc:
+            cc_lc.loc[j,'pd'] = df_gsim.loc[k,'pd.mean']
+        if 'st' in var_lc:
+            cc_lc.loc[j,'st'] = df_gsim.loc[k,'soil.type']
+        if 'nld' in var_lc:
+            cc_lc.loc[j,'nld'] = df_gsim.loc[k,'nl.mean']
+        if 'ds' in var_lc:
+            cc_lc.loc[j,'ds'] = df_gsim.loc[k,'no.dams']
+        if 'dv' in var_lc:
+            cc_lc.loc[j,'dv'] = df_gsim.loc[k,'sto.volume']
+        if 'clt' in var_lc:
+            cc_lc.loc[j,'clt'] = df_gsim.loc[k,'climate.type']
     else:
         # use aus information
         df_aus = pd.read_csv(f'{work_dir}/data/CAMELS_AUS/CAMELS_AUS_Attributes-Indices_MasterTable.csv',index_col=0)
         cc_lc.loc[j,['drd','cla','snd']] = df_aus.loc[j,['strdensity','claya','sanda']].values  
-        cc_lc.loc[j,['ir_mean','slt','tpi']] = np.nan # not available for camels aus    
+        cc_lc.loc[j,['ir_mean','slt','tpi','lc','lit','pop','pd','st','nld','ds','dv','clt']] = np.nan # not available for camels aus   
     return cc_lc
 
 def catch_characteristics_climate_snow(var_sn, catch_id,work_dir,data_sources):
@@ -693,14 +733,18 @@ def catch_characteristics(var_lc,var_cl,var_sn, catch_id, work_dir,data_sources)
     combine climate and landscape variables in one dataframe
     returns: catchment characteristics dataframe cc - saved as csv file
     """
-    # if not os.path.exists(f'{work_dir}/output/catchment_characteristics/{data_sources}/'):
-    #     os.makedirs(f'{work_dir}/output/catchment_characteristics/{data_sources}/')
-    
     cc_lc = catch_characteristics_landscape(var_lc,catch_id,work_dir)
     cc_cl = catch_characteristics_climate(var_cl, catch_id,work_dir,data_sources)
     cc_sn = catch_characteristics_climate_snow(var_sn, catch_id,work_dir,data_sources)
     cc = pd.concat([cc_cl,cc_sn,cc_lc],axis=1)
-    cc.to_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/{catch_id}.csv') #store cc dataframe
+    
+    # merge with existing dataframe
+    if os.path.exists(f'{work_dir}/output/catchment_characteristics/{data_sources}/{catch_id}.csv'):
+        cce = pd.read_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/{catch_id}.csv',index_col=0)
+        cc2 = pd.concat([cc,cce],axis=1)
+    else: 
+        cc2 = cc
+    cc2.to_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/{catch_id}.csv') #store cc dataframe
     
 
 def run_function_parallel_catch_characteristics(

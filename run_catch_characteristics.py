@@ -36,13 +36,23 @@ print(work_dir)
 print(out_dir)
 print(data_dir)
 
-var_lc=['tc','ntc','nonveg','area','ir_mean','el_mean','el_min','el_max','el_std','drd','slp_mean','slp_max','slp_min','slp_std','cla','snd','slt','tpi']
+# define in and output folder
+var_lc=['tc','ntc','nonveg','area','ir_mean','el_mean','el_min','el_max','el_std','drd','slp_mean','slp_max','slp_min','slp_std','cla','snd','slt','tpi','bp','dtb','iwu','ds','dv','pd','pop','nld','clt','lc','lit']
 var_cl=['p_mean','ep_mean','q_mean','t_mean','ai','hai','tdiff_max','tdiff_mean','idu_mean','idu_max','hpd_mean','hpd_max','hpf','lpf','si_p','si_ep','phi','de','dp','dt','sp','st','se','sd','sti','ftf']
 var_sn=['idu_mean_l','idu_max_l','hpd_mean_l','hpd_max_l','hpf_l','lpf_l','si_pl','phi_l','de_l','dp_l','dt_l','sp_l','st_l','se_l','sd_l','sti_l']
 
 catch_id_list = np.genfromtxt(f'{work_dir}/output/gsim_aus_catch_id_list_lo_sel.txt',dtype='str')[:] # test for 3 catchments -> run on delftblue for all catchments with catch_characteristics.py
 
 data_sources = 'gswp-p_gleam-ep_gswp-t'
+
+# # check which characteristics are already processed, only process new ones
+# cc = pd.read_csv(f'{work_dir}/output/catchment_characteristics/catchment_characteristics_{data_sources}.csv',index_col=0)
+# col = cc.columns #variables in col are already processed
+
+# # make lists of variables that are not processed yet
+# var_lc = list(set(var_lc) - set(col))
+# var_cl = list(set(var_cl) - set(col))
+# var_sn = list(set(var_sn) - set(col))
 
 # make lists for parallel computation
 catch_list = catch_id_list.tolist()

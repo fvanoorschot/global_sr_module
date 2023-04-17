@@ -55,14 +55,18 @@ print(data_dir)
 # # run function parallel
 # run_iwu_function_parallel(shapefile_list, netcdf_list, output_dir_list)
 
-# define directories 
-nc_bd = f'{work_dir}/data/mswep_p/daily_peryear/1990.nc' # dir of netcdf forcing files
+# MSWEP
 out_dir = f'{work_dir}/output/forcing_timeseries/mswep_p/raw/' # output dir
 operator = 'mean'
 
 shape_dir = Path(f'{work_dir}/output/selected_shapes/')
-shapefile_list = glob.glob(f'{shape_dir}/*.shp')[0:3]
+shapefiles = glob.glob(f'{shape_dir}/*.shp')[:]
+netcdfs = glob.glob(f'{work_dir}/data/mswep_p/years_processed/*.nc')
 
-netcdf_list = [nc_bd]*len(shapefile_list)
-output_dir_list = [out_dir]*len(shapefile_list)
+shapefile_list = shapefiles * len(netcdfs)
+shapefile_list.sort()
+netcdf_list = netcdfs * len(shapefiles)
+output_dir_list = [out_dir] * len(shapefile_list)
 operator_list = [operator]*len(shapefile_list)
+
+run_function_parallel(shapefile_list, netcdf_list, operator_list, output_dir_list)
