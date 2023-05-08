@@ -57,6 +57,7 @@ def sd_initial(df, si_0, si_max, q_mean,s):
     df.loc[:,'Si_3'] = np.nan
     df.loc[:,'Et'] = np.nan
     df.loc[:,'Sd'] = np.nan
+    df.loc[:,'se'] = np.nan
 
     # convert to numpy arrays (to speed up calculations)
     p = np.array(df.p.values)
@@ -74,6 +75,7 @@ def sd_initial(df, si_0, si_max, q_mean,s):
     si3 = np.zeros(len(df))
     et = np.zeros(len(df))
     sd = np.zeros(len(df))
+    se = np.zeros(len(df))
 
     if (s==1): # snow
         #calculate interception storage and effective precipitation for all timesteps
@@ -118,7 +120,7 @@ def sd_initial(df, si_0, si_max, q_mean,s):
     EP_mean = np.mean(ep)
     Q_mean = q_mean #q_mean from other file than p and e because yearly timeseries
     Et_mean = Pe_mean - Q_mean
-
+    
     #check if water balance is ok
     if Et_mean<0: # if this is the case, it is not possible to calculate sd
         b = 1 # wb not ok
@@ -136,6 +138,9 @@ def sd_initial(df, si_0, si_max, q_mean,s):
             et[l] = ep[l]/EP_mean * Et_mean
             sd[l] = min(0,sd[l-1]+pe[l]-et[l])
 
+            if (sd[l]==0):
+                se[l] = pe[l]-et[l]
+    
     # add numpy arrays to dataframe
     df.Si_1 = si1
     df.Si_2 = si2
@@ -144,14 +149,12 @@ def sd_initial(df, si_0, si_max, q_mean,s):
     df.Ei = ei
     df.Sd = sd
     df.Et = et
-    
-    # if(df.Sd.mean()==0):
-    #     df.Sd=np.nan
-    
+    df.se = se
+                
     return b, df
 
 ## 2
-def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir):
+def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list, irri_id_list,snow_dir,work_dir):
     """
     run calculation of storage deficits (1)
     
@@ -249,17 +252,133 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir):
         if b==0:      
             # save output dataframe from sd calculation
             out = sd_initial(sd_input, si_0, si_max, q_mean,s)[1]
-            out.to_csv(f'{out_dir}/{catch_id}.csv')
+            
+            if catch_id in irri_id_list:
+                irri = irrigation_sd(out,catch_id,work_dir)
+                out = irri[0] 
+                se_out = irri[1]
+                f = irri[2]
+                # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}.csv')
+                # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_fiwu.csv')
+                se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}ia.csv')
+            
+                # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}.csv')
+                # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_fiwu.csv')
+                out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}ia.csv')
+            else: 
+                out.to_csv(f'{out_dir}/{catch_id}.csv')
             return out
         
-## 3
+        
+def irrigation_sd(df,catch_id,work_dir):
+    s = df
+    split_dates = []
+    start_date = df.index[0]
+    split_dates.append(start_date)
+    se_l = []
+    se_used = []
+    ldd_l = []
+    lde_l = []
+    days_l = []
+    f_ar = []
+    s2 = s #make new dataframe, copy of s which is output of initial sd calculation
+    s2['p_irri']=s.Pe #set initially p irri to Pe
+    s2['sd2']=s.Sd
+    s2['se2']=s.se
+    iwu = pd.read_csv(f'{work_dir}/output/irrigation/processed/monthly_mean/{catch_id}.csv',index_col=0)
+    iwu_mean = iwu.mean().values[0]*365
+    cc = pd.read_csv(f'{work_dir}/output/catchment_characteristics/gswp-p_gleam-ep_gswp-t/{catch_id}.csv',index_col=0)
+    ir_area = cc.ir_mean.values
+
+    years=len(np.unique(s.index.year)) #count years
+    for i in range(years):
+        ss = s2.iloc[i*365:(i*365)+365] #select 1 year
+        min_date = ss[ss.Sd==ss.Sd.min()].index.values[0] #select date where Sd minimizes
+        split_dates.append(min_date) #append first date to split_dates list
+        sp = s2.loc[split_dates[i]:split_dates[i+1]]
+        se_sum = sp.se2.sum() #sum se from start date to date with min Sd
+        se_l.append(se_sum)
+
+        # find last date of Se>0 BEFORE min date = first day deficit
+        sss = ss.loc[:min_date]
+        if (len(sss.se[sss.se>0])>0):
+            lde = sss.se[sss.se>0].index[-1]
+        else:
+            lde = sss.index[0]   
+            
+        # find first day of deficit Sd<0 AFTER min date = last day deficit
+        sss = ss.loc[min_date:]
+        if (len(sss.Sd[sss.Sd<0])>0):
+            ldd = sss[sss.Sd<0].index[-1]
+        else:
+            ldd = sss.Sd.index[-1]
+            
+        ldd_l.append(ldd)
+        lde_l.append(lde)
+        dd = ss.loc[lde+timedelta(days=1):ldd] # select from start of deficit until end of deficit period
+        days = len(dd) # length of deficit period = length of irrigation period
+        days_l.append(days)
+
+        # f = 0.17 # this is just a random assumption -> use IWU and irri-area to estimate f
+        
+        # f based on fixed factor and irrigated area fraction
+        f = 2.2
+        f2 = min(f*ir_area, 1) 
+        
+        # f based on IWU directly
+        # if (se_sum>0):
+        #     f = iwu_mean/se_sum
+        # else: 
+        #     f=0
+        # if (f>1):
+        #     f=1
+        
+        f_ar.append(f2[0])
+        irri = f2 * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
+        se_used.append(f2[0]*se_sum)
+
+        # add irri to p
+        p_irri = dd['Pe'] + irri # preciptiation+irrigation
+        dfp2 = pd.DataFrame(index=ss.index, columns=['p_irri'])
+        dfp2.p_irri = p_irri
+        dfp2 = dfp2.fillna(-1)
+        dfp2.p_irri.loc[dfp2[dfp2.p_irri<0].index] = ss.Pe.loc[dfp2[dfp2.p_irri<0].p_irri.index] # set nan values in dfp2 (no irrigation) to original p values
+        ss['p_irri'] = dfp2['p_irri'] # add p_irri to ss dataframe
+        s2.p_irri.iloc[i*365:(i*365)+365] = ss['p_irri'] #update p_irri in s2
+
+        #update sd and se in full timeseries from year -> end
+        for l in range(i*365,len(s2)):
+            if (i==0)&(l==0):
+                s2['sd2'].iloc[l]=0
+            else:
+                s2['sd2'].iloc[l] = min(0,s2['sd2'].iloc[l-1]+s2['p_irri'][l]-s2['Et'][l])
+            if (s2['sd2'].iloc[l]==0):
+                s2['se2'].iloc[l] = s2.p_irri[l]-s2.Et[l]
+
+    # make irrigation dataframe
+    df_se = pd.DataFrame(index=range(len(se_used)), columns=['start_date_se','end_date_se','start_date_irri','end_date_irri','se','f','se_used','iwu_mean','days_irri'])
+    df_se['se'] = se_l
+    df_se['se_used'] = se_used
+    df_se['f'] = f_ar
+    df_se['start_date_se'] = split_dates[:-1]
+    df_se['end_date_se'] = split_dates[1:]
+    df_se['start_date_irri'] = lde_l
+    df_se['end_date_irri'] = ldd_l
+    df_se['days_irri'] = days_l
+    df_se['iwu_mean'] = [iwu_mean] * len(df_se.index)
+    
+    return(s2, df_se, f)
+
+        
 def run_sd_calculation_parallel(
     catch_id_list=list,
     pep_dir_list=list,
     q_dir_list=list,
     out_dir_list=list,
     snow_id_list=list,
+    irri_id_list=list,
     snow_dir_list=list,
+    work_dir_list=list,
     # threads=None
     threads=200
 ):
@@ -289,10 +408,10 @@ def run_sd_calculation_parallel(
         q_dir_list,
         out_dir_list,
         snow_id_list,
-        snow_dir_list
+        irri_id_list,
+        snow_dir_list,
+        work_dir_list
     )
-
-    # return results
         
 ## 4
 def plot_sd(catch_id, sd_dir):
@@ -314,7 +433,6 @@ def plot_sd(catch_id, sd_dir):
     ax.set_title(f'catchment {catch_id}')
             
             
-## 5
 def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,date_end):
     """
     calculate sr for different return periods - min max root zone year approach from Stijn??
@@ -425,7 +543,7 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
 
        
 ## 6
-def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir):
+def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f,irri_id_list):
     """
     run sr calculation
     
@@ -438,39 +556,52 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir):
     
     """
     # check if sd exists for catchment id
-    if(os.path.exists(f'{sd_dir}/{catch_id}.csv')==True):  
+    if(os.path.exists(f'{sd_dir}/{catch_id}.csv')==True) or (os.path.exists(f'{sd_dir}/irri/sd/{catch_id}_f{f}.csv')==True):  
         
-        # read storage deficit table
-        sd_table = pd.read_csv(f'{sd_dir}/{catch_id}.csv',index_col=0)
-        sd_table.index = pd.to_datetime(sd_table.index)
-        
-        # get sd, start and end year and date from sd_table
-        Sd = sd_table.Sd
+        if catch_id in irri_id_list:
+            # read storage deficit table
+            sd_table = pd.read_csv(f'{sd_dir}/irri/sd/{catch_id}_f{f}.csv',index_col=0)
+            sd_table.index = pd.to_datetime(sd_table.index)
+
+            # get sd, start and end year and date from sd_table
+            Sd = sd_table.sd2
+
+        else:
+            # read storage deficit table
+            sd_table = pd.read_csv(f'{sd_dir}/{catch_id}.csv',index_col=0)
+            sd_table.index = pd.to_datetime(sd_table.index)
+
+            # get sd, start and end year and date from sd_table
+            Sd = sd_table.Sd
         year_start = sd_table.index[0].year
         year_end = sd_table.index[-1].year
         date_start = str(sd_table.index[0].month)+'-'+str(sd_table.index[0].day)
         date_end = str(sd_table.index[-1].month)+'-'+str(sd_table.index[-1].day)
         if(date_end=='2-29'):
             date_end='2-28'
-        
-        if (year_end-year_start)>10:#only if our timeseries is longer than 10years
+
+        if ((year_end-year_start)>10) and (sd_table.Et.max()>0):#only if our timeseries is longer than 10years and Et is not nan
             # calculate sr for different return periods using (4)
             sr_T = sr_return_periods_minmax_rzyear(rp_array, Sd, year_start, year_end, date_start, date_end)
 
             # store dataframe with catchment sr values
             sr_df = pd.DataFrame(index=[catch_id], columns=rp_array)
             sr_df.loc[catch_id]=sr_T
-            sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
 
+            if catch_id in irri_id_list:     
+                sr_df.to_csv(f'{sd_dir}/irri/sr/{catch_id}_f{f}.csv')
+            else:
+                sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
             return(sr_df)
 
     
-## 3
 def run_sr_calculation_parallel(
     catch_id_list=list,
     rp_array_list=list,
     sd_dir_list=list,
     out_dir_list=list,
+    f_list = list,
+    irri_id_list=list,
     # threads=None
     threads=100
 ):
@@ -497,9 +628,9 @@ def run_sr_calculation_parallel(
         rp_array_list,
         sd_dir_list,
         out_dir_list,
+        f_list,
+        irri_id_list,
     )
-
-    # return results    
 
 ## 7
 def merge_sr_catchments(sr_dir,out_dir):
