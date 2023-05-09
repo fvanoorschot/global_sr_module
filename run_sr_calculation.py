@@ -35,7 +35,6 @@ print(work_dir)
 print(out_dir)
 print(data_dir)
 
-# TESTS FOR IRRI
 pep_dir = f'{work_dir}/output/forcing_timeseries/processed/daily'
 q_dir = f'{work_dir}/output/q_timeseries_selected'
 out_dir = f'{work_dir}/output/sr_calculation/sd_catchments'

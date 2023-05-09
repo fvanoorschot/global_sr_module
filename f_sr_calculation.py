@@ -258,13 +258,14 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list, irri_id_l
                 out = irri[0] 
                 se_out = irri[1]
                 f = irri[2]
-                # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}.csv')
+                se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}.csv')
                 # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_fiwu.csv')
-                se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}ia.csv')
+                # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}ia.csv')
             
-                # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}.csv')
+                out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}.csv')
+                out.to_csv(f'{out_dir}/{catch_id}.csv')
                 # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_fiwu.csv')
-                out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}ia.csv')
+                # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}ia.csv')
             else: 
                 out.to_csv(f'{out_dir}/{catch_id}.csv')
             return out
@@ -319,11 +320,11 @@ def irrigation_sd(df,catch_id,work_dir):
         days = len(dd) # length of deficit period = length of irrigation period
         days_l.append(days)
 
-        # f = 0.17 # this is just a random assumption -> use IWU and irri-area to estimate f
+        f = 0.17 #
         
         # f based on fixed factor and irrigated area fraction
-        f = 1.5
-        f2 = min(f*ir_area, 1) 
+        # f = 1.5
+        # f2 = min(f*ir_area, 1) 
         
         # f based on IWU directly
         # if (se_sum>0):
@@ -560,7 +561,7 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f,irri_id_list):
         
         if catch_id in irri_id_list:
             # read storage deficit table
-            sd_table = pd.read_csv(f'{sd_dir}/irri/sd/{catch_id}_f{f}.csv',index_col=0)
+            sd_table = pd.read_csv(f'{sd_dir}/{catch_id}.csv',index_col=0)
             sd_table.index = pd.to_datetime(sd_table.index)
 
             # get sd, start and end year and date from sd_table
