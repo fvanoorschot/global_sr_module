@@ -322,7 +322,7 @@ def irrigation_sd(df,catch_id,work_dir):
         # f = 0.17 # this is just a random assumption -> use IWU and irri-area to estimate f
         
         # f based on fixed factor and irrigated area fraction
-        f = 2.2
+        f = 1.5
         f2 = min(f*ir_area, 1) 
         
         # f based on IWU directly
