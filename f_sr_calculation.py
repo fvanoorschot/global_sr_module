@@ -321,7 +321,7 @@ def irrigation_sd(df,catch_id,work_dir):
         days_l.append(days)
 
         f = 0.17 #
-        
+        f2 = f
         # f based on fixed factor and irrigated area fraction
         # f = 1.5
         # f2 = min(f*ir_area, 1) 
@@ -591,6 +591,7 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f,irri_id_list):
 
             if catch_id in irri_id_list:     
                 sr_df.to_csv(f'{sd_dir}/irri/sr/{catch_id}_f{f}.csv')
+                sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
             else:
                 sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
             return(sr_df)
