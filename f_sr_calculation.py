@@ -320,11 +320,11 @@ def irrigation_sd(df,catch_id,work_dir):
         days = len(dd) # length of deficit period = length of irrigation period
         days_l.append(days)
 
-        f = 0.17 #
-        f2 = f
+        # f = 0.17 #
+        # f2 = f
         # f based on fixed factor and irrigated area fraction
-        # f = 1.5
-        # f2 = min(f*ir_area, 1) 
+        f = 1.9
+        f2 = min(f*ir_area, 1) 
         
         # f based on IWU directly
         # if (se_sum>0):
@@ -529,8 +529,8 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
         return loc, scale    
 
     # calculate gumbel parameters
-    # loc1, scale1 = gumbel_r_mom(Sd_maxmin_rz_year)
-    loc1, scale1 = gumbel_r_mom(Sd_maxmin)
+    loc1, scale1 = gumbel_r_mom(Sd_maxmin_rz_year)
+    # loc1, scale1 = gumbel_r_mom(Sd_maxmin)
 
     # find Sd value corresponding with return period
     Sd_T = []
