@@ -154,7 +154,7 @@ def sd_initial(df, si_0, si_max, q_mean,s):
     return b, df
 
 ## 2
-def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list, irri_id_list,snow_dir,work_dir):
+def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir,work_dir):
     """
     run calculation of storage deficits (1)
     
@@ -174,6 +174,9 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list, irri_id_l
         s = 0 # snow is no
         # get P Ep and Q files for catch id
         f_pep = glob.glob(f'{pep_dir}/{catch_id}*.csv')
+        
+    cc = pd.read_csv(f'{work_dir}/output/catchment_characteristics/gswp-p_gleam-ep_gswp-t/{catch_id}.csv',index_col=0)
+    ir_area = cc.ir_mean.values
 
     # read q df
     f_q = glob.glob(f'{q_dir}/{catch_id}*.csv')
@@ -253,21 +256,25 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list, irri_id_l
             # save output dataframe from sd calculation
             out = sd_initial(sd_input, si_0, si_max, q_mean,s)[1]
             
-            if catch_id in irri_id_list:
+            # if catch_id in irri_id_list:
+            # if ir_area>0.01:
+            if ir_area>0:
                 irri = irrigation_sd(out,catch_id,work_dir)
                 out = irri[0] 
                 se_out = irri[1]
                 f = irri[2]
-                se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}.csv')
-                # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_fiwu.csv')
+                se_out.to_csv(f'{out_dir}/irri/f1.9ia/se/{catch_id}_f1.9ia.csv')
+                # se_out.to_csv(f'{out_dir}/irri/fiwu/se/{catch_id}_fiwu.csv')
                 # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}ia.csv')
             
-                out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}.csv')
-                out.to_csv(f'{out_dir}/{catch_id}.csv')
-                # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_fiwu.csv')
+                out.to_csv(f'{out_dir}/irri/f1.9ia/sd/{catch_id}_f1.9ia.csv')
+                # out.to_csv(f'{out_dir}/{catch_id}.csv')
+                # out.to_csv(f'{out_dir}/irri/fiwu/sd/{catch_id}_fiwu.csv')
                 # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}ia.csv')
             else: 
-                out.to_csv(f'{out_dir}/{catch_id}.csv')
+                # out.to_csv(f'{out_dir}/irri/fiwu/sd/{catch_id}_fiwu.csv')
+                out.to_csv(f'{out_dir}/irri/f1.9ia/sd/{catch_id}_f1.9ia.csv')
+
             return out
         
         
@@ -333,9 +340,11 @@ def irrigation_sd(df,catch_id,work_dir):
         #     f=0
         # if (f>1):
         #     f=1
+        # f2=f
         
-        f_ar.append(f2[0])
-        irri = f2 * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
+        f_ar.append(f2[0]) #use this with fia
+        # f_ar.append(f2)
+        irri = f2[0] * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
         se_used.append(f2[0]*se_sum)
 
         # add irri to p
@@ -377,7 +386,6 @@ def run_sd_calculation_parallel(
     q_dir_list=list,
     out_dir_list=list,
     snow_id_list=list,
-    irri_id_list=list,
     snow_dir_list=list,
     work_dir_list=list,
     # threads=None
@@ -409,7 +417,6 @@ def run_sd_calculation_parallel(
         q_dir_list,
         out_dir_list,
         snow_id_list,
-        irri_id_list,
         snow_dir_list,
         work_dir_list
     )
@@ -529,8 +536,8 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
         return loc, scale    
 
     # calculate gumbel parameters
-    loc1, scale1 = gumbel_r_mom(Sd_maxmin_rz_year)
-    # loc1, scale1 = gumbel_r_mom(Sd_maxmin)
+    # loc1, scale1 = gumbel_r_mom(Sd_maxmin_rz_year)
+    loc1, scale1 = gumbel_r_mom(Sd_maxmin)
 
     # find Sd value corresponding with return period
     Sd_T = []
@@ -557,11 +564,11 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f,irri_id_list):
     
     """
     # check if sd exists for catchment id
-    if(os.path.exists(f'{sd_dir}/{catch_id}.csv')==True) or (os.path.exists(f'{sd_dir}/irri/sd/{catch_id}_f{f}.csv')==True):  
+    if(os.path.exists(f'{sd_dir}/{catch_id}.csv')==True) or (os.path.exists(f'{sd_dir}/no_irri/sd/{catch_id}.csv')==True):  
         
         if catch_id in irri_id_list:
             # read storage deficit table
-            sd_table = pd.read_csv(f'{sd_dir}/{catch_id}.csv',index_col=0)
+            sd_table = pd.read_csv(f'{sd_dir}/irri/sd/{catch_id}_f{f}.csv',index_col=0)
             sd_table.index = pd.to_datetime(sd_table.index)
 
             # get sd, start and end year and date from sd_table
@@ -569,7 +576,7 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f,irri_id_list):
 
         else:
             # read storage deficit table
-            sd_table = pd.read_csv(f'{sd_dir}/{catch_id}.csv',index_col=0)
+            sd_table = pd.read_csv(f'{sd_dir}/no_irri/sd/{catch_id}.csv',index_col=0)
             sd_table.index = pd.to_datetime(sd_table.index)
 
             # get sd, start and end year and date from sd_table
@@ -593,7 +600,7 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f,irri_id_list):
                 sr_df.to_csv(f'{sd_dir}/irri/sr/{catch_id}_f{f}.csv')
                 sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
             else:
-                sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
+                sr_df.to_csv(f'{out_dir}/no_irri/sr/{catch_id}.csv')
             return(sr_df)
 
     
