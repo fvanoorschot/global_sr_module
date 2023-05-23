@@ -130,25 +130,25 @@ def elevation_stats(catch_id,work_dir):
     # get elevation image
     # DEM = ee.Image('CGIAR/SRTM90_V4')
     # ele = DEM.select('elevation')
-    DEM = ee.Image("WWF/HydroSHEDS/15CONDEM")
-    ele = DEM.select('b1')
-    slope = ee.Terrain.slope(ele);
-    ele_res = ele.resample('bilinear').reproject(crs=ele.projection().crs(), scale=450)
-    slope_res = slope.resample('bilinear').reproject(crs=slope.projection().crs(), scale=450)
+    DEM = ee.Image("WWF/HydroSHEDS/15CONDEM") #here we load a DEM
+    ele = DEM.select('b1') # select the elevation band
+    slope = ee.Terrain.slope(ele); # compute slope
+    ele_res = ele.resample('bilinear').reproject(crs=ele.projection().crs(), scale=450) # get coarser resolution
+    slope_res = slope.resample('bilinear').reproject(crs=slope.projection().crs(), scale=450) # get coarser resolution
     
     # make feature from catchment shape
-    shape_dir = Path(f'{work_dir}/output/selected_shapes/')
-    f = glob.glob(f'{shape_dir}/{catch_id}.shp')[0]
-    shapefile = gpd.read_file(f)
+    shape_dir = Path(f'{work_dir}/output/selected_shapes/') #directory with shapefiles
+    f = glob.glob(f'{shape_dir}/{catch_id}.shp')[0] #load specific catchment id shapefile
+    shapefile = gpd.read_file(f) # read shapefile
     features = []
-    for j in range(shapefile.shape[0]):
+    for j in range(shapefile.shape[0]): #preprocess shapefile
         geom = shapefile.iloc[j:j+1,:] 
         jsonDict = eval(geom.to_json()) 
         geojsonDict = jsonDict['features'][0] 
         features.append(ee.Feature(geojsonDict))
 
     # area of interest = feature = catchment geometry
-    aoi = ee.FeatureCollection(features).geometry()
+    aoi = ee.FeatureCollection(features).geometry() #take pixels inside shapefile
 
     # specifiy reducer statistics (here mean, stdev, max and min)
     reducers = ee.Reducer.mean().combine(
@@ -162,11 +162,11 @@ def elevation_stats(catch_id,work_dir):
       sharedInputs= True
     )
 
-    # reduce the elevation images with the reducers and the aoi 
+    # reduce the elevation images with the reducers and the aoi - match grid with the shapefile
     ele_mean = ele_res.reduceRegions(collection= aoi,reducer=reducers, scale=450) #scale 1110 m > 1 degree
     slope_mean = slope_res.reduceRegions(collection= aoi,reducer=reducers, scale=450) #scale 1110 m > 1 degree
 
-    # write to dictionary (1)
+    # write to dictionary (1) - to get readable output
     ele = write_dict(ele_mean).getInfo()
     slope = write_dict(slope_mean).getInfo()
     

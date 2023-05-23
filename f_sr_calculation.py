@@ -263,17 +263,17 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir,w
                 out = irri[0] 
                 se_out = irri[1]
                 f = irri[2]
-                se_out.to_csv(f'{out_dir}/irri/f1.9ia/se/{catch_id}_f1.9ia.csv')
+                se_out.to_csv(f'{out_dir}/irri/f1.85ia/se/{catch_id}_f1.8ia.csv')
                 # se_out.to_csv(f'{out_dir}/irri/fiwu/se/{catch_id}_fiwu.csv')
                 # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}ia.csv')
             
-                out.to_csv(f'{out_dir}/irri/f1.9ia/sd/{catch_id}_f1.9ia.csv')
+                out.to_csv(f'{out_dir}/irri/f1.85ia/sd/{catch_id}_f1.8ia.csv')
                 # out.to_csv(f'{out_dir}/{catch_id}.csv')
                 # out.to_csv(f'{out_dir}/irri/fiwu/sd/{catch_id}_fiwu.csv')
                 # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}ia.csv')
             else: 
                 # out.to_csv(f'{out_dir}/irri/fiwu/sd/{catch_id}_fiwu.csv')
-                out.to_csv(f'{out_dir}/irri/f1.9ia/sd/{catch_id}_f1.9ia.csv')
+                out.to_csv(f'{out_dir}/irri/f1.85ia/sd/{catch_id}_f1.8ia.csv')
 
             return out
         
@@ -330,7 +330,7 @@ def irrigation_sd(df,catch_id,work_dir):
         # f = 0.17 #
         # f2 = f
         # f based on fixed factor and irrigated area fraction
-        f = 1.9
+        f = 1.85
         f2 = min(f*ir_area, 1) 
         
         # f based on IWU directly
@@ -342,10 +342,23 @@ def irrigation_sd(df,catch_id,work_dir):
         #     f=1
         # f2=f
         
-        f_ar.append(f2[0]) #use this with fia
+        #use this with fia
+        f_ar.append(f2[0]) 
+        if (days>0):
+            irri = f2[0] * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
+            se_used.append(f2[0]*se_sum)
+        else:
+            irri=0
+            se_used.append(0)
+            
+        # use this with fiwu
         # f_ar.append(f2)
-        irri = f2[0] * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
-        se_used.append(f2[0]*se_sum)
+        # if (days>0):
+        #     irri = f2 * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
+        #     se_used.append(f2*se_sum)
+        # else:
+        #     irri=0
+        #     se_used.append(0)
 
         # add irri to p
         p_irri = dd['Pe'] + irri # preciptiation+irrigation
@@ -551,7 +564,7 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
 
        
 ## 6
-def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f,irri_id_list):
+def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f):
     """
     run sr calculation
     
@@ -564,23 +577,18 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f,irri_id_list):
     
     """
     # check if sd exists for catchment id
-    if(os.path.exists(f'{sd_dir}/{catch_id}.csv')==True) or (os.path.exists(f'{sd_dir}/no_irri/sd/{catch_id}.csv')==True):  
+    if(os.path.exists(f'{sd_dir}/irri/f{f}/sd/{catch_id}_f{f}.csv')==True):  
         
-        if catch_id in irri_id_list:
-            # read storage deficit table
-            sd_table = pd.read_csv(f'{sd_dir}/irri/sd/{catch_id}_f{f}.csv',index_col=0)
-            sd_table.index = pd.to_datetime(sd_table.index)
+        # read storage deficit table
+        sd_table = pd.read_csv(f'{sd_dir}/irri/f{f}/sd/{catch_id}_f{f}.csv',index_col=0)
+        sd_table.index = pd.to_datetime(sd_table.index)
 
-            # get sd, start and end year and date from sd_table
+        # get sd, start and end year and date from sd_table
+        if 'sd2' in sd_table.columns:
             Sd = sd_table.sd2
-
         else:
-            # read storage deficit table
-            sd_table = pd.read_csv(f'{sd_dir}/no_irri/sd/{catch_id}.csv',index_col=0)
-            sd_table.index = pd.to_datetime(sd_table.index)
-
-            # get sd, start and end year and date from sd_table
             Sd = sd_table.Sd
+
         year_start = sd_table.index[0].year
         year_end = sd_table.index[-1].year
         date_start = str(sd_table.index[0].month)+'-'+str(sd_table.index[0].day)
@@ -596,11 +604,8 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f,irri_id_list):
             sr_df = pd.DataFrame(index=[catch_id], columns=rp_array)
             sr_df.loc[catch_id]=sr_T
 
-            if catch_id in irri_id_list:     
-                sr_df.to_csv(f'{sd_dir}/irri/sr/{catch_id}_f{f}.csv')
-                sr_df.to_csv(f'{out_dir}/{catch_id}.csv')
-            else:
-                sr_df.to_csv(f'{out_dir}/no_irri/sr/{catch_id}.csv')
+            sr_df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}.csv')
+
             return(sr_df)
 
     
@@ -610,7 +615,6 @@ def run_sr_calculation_parallel(
     sd_dir_list=list,
     out_dir_list=list,
     f_list = list,
-    irri_id_list=list,
     # threads=None
     threads=100
 ):
@@ -638,7 +642,6 @@ def run_sr_calculation_parallel(
         sd_dir_list,
         out_dir_list,
         f_list,
-        irri_id_list,
     )
 
 ## 7

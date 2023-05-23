@@ -753,3 +753,159 @@ def run_iwu_processing_parallel(
         catch_id_list,
         work_dir_list,
     )
+    
+    
+def irri_area_catchment(catchment_shapefile,catchment_netcdf,out_dir):
+    # Load iris cube of netcdf
+    cube = iris.load_cube(catchment_netcdf)
+    cube.dim_coords[1].guess_bounds()
+    cube.dim_coords[2].guess_bounds()
+
+    # Create target grid and regrid cube
+    grid_resolution=0.05
+    statistical_operator='mean'
+    target_cube = regridding_target_cube(catchment_shapefile, grid_resolution, buffer=1) #create the regrid target cube
+    cube = preprocessor.regrid(cube, target_cube, scheme="area_weighted") #regrid the netcdf file (conservative) to a higher resolution
+
+    # From cube extract shapefile shape
+    cube = preprocessor.extract_shape(cube, catchment_shapefile, method="contains") #use all grid cells that lie >50% inside the catchment shape
+
+    # Calculate area weighted statistics of extracted grid cells (inside catchment shape)
+    cube_stats = preprocessor.area_statistics(cube, statistical_operator)
+
+    # Convert cube to dataframe
+    df = iris.pandas.as_data_frame(cube_stats)
+
+    # Change column names of timeseries dataframe
+    df = df.reset_index()
+    df = df.set_axis(["time", cube_stats.name()], axis=1)
+    
+    catch_id = catchment_shapefile[57:-4]
+    df.to_csv(f'{out_dir}/{catch_id}.csv')
+    
+def run_irri_area_parallel(
+    shapefile_list=list,
+    netcdf_list=list,
+    out_dir_list=list,
+    threads=None
+    #threads=100
+):
+    """
+    Runs function area_weighted_shapefile_rasterstats cru in parallel.
+
+    shapefile_list:  str, list, list of input catchment shapefiles
+    netcdf_list:     str, list, list of input netcdf files
+    output_dir_list: str, list, list of output directories
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        irri_area_catchment,
+        shapefile_list,
+        netcdf_list,
+        out_dir_list,
+    )
+    
+    
+# for j in variable list - list the timeseries csvs for the catch id
+def process_p_mswep(catch_id,work_dir):
+    f=os.path.split(catch_id)[1] # remove full path
+    f = f[:-4] # remove .year extension
+    l = glob.glob(f'{work_dir}/output/raw/{f}*.csv')
+
+    # combine variable timeseries in one dataframe
+    li=[] #make empty list
+    for filename in l:
+        df = pd.read_csv(filename,index_col=1)
+        df = df.drop(columns=['Unnamed: 0'])
+        df.index = pd.to_datetime(df.index)
+        li.append(df) #append dataframe to list
+
+    d = pd.DataFrame()
+    frame = pd.concat(li, axis=0, ignore_index=False) #concatenate dataframes in li
+    col=frame.columns #get column names 
+    y_start,y_end = frame.index[0].year, frame.index[-1].year #add columns with start and end years
+    d[col] = frame #add frame data to dataframe d
+    d = d.sort_index()
+    d.to_csv(f'{work_dir}/output/processed/{f}_1979_2019.csv')
+    
+def run_mswep_processing_function_parallel(
+    catch_id_list=list,
+    work_dir_list=list,
+    # threads=None
+    threads=100
+):
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        process_p_mswep,
+        catch_id_list,
+        work_dir_list,
+    )
+    
+def process_mswep_timeseries(catch_id,work_dir):
+    d = pd.DataFrame()
+
+    # for j in variable list - list the timeseries csvs for the catch id
+    l = glob.glob(f'{work_dir}/output/forcing_timeseries/mswep_p/processed_timeseries/{catch_id}*.csv')
+    df = pd.read_csv(l[0], index_col=0, header=0)
+    d = df
+    d = d.rename(columns={'precipitation':'p'})
+    d.index = pd.to_datetime(d.index)
+
+    fol_out = f'{work_dir}/output/forcing_timeseries/mswep_p/processed'
+    # get monthly timeseries and store as csv
+    if not os.path.exists(f'{fol_out}/monthly'):
+         os.makedirs(f'{fol_out}/monthly')
+    df_m = d.groupby(pd.Grouper(freq='M')).mean()
+    y_start,y_end = df_m.index[0].year, df_m.index[-1].year
+    df_m.to_csv(f'{fol_out}/monthly/{catch_id}_{y_start}_{y_end}.csv')    
+
+    # get climatology and store as csv
+    if not os.path.exists(f'{fol_out}/climatology'):
+         os.makedirs(f'{fol_out}/climatology')
+    df_m = df_m.groupby([df_m.index.month]).mean()
+    df_m.to_csv(f'{fol_out}/climatology/{catch_id}_{y_start}_{y_end}.csv')
+
+    # get yearly timeseries and store as csv
+    if not os.path.exists(f'{fol_out}/yearly'):
+         os.makedirs(f'{fol_out}/yearly')
+    df_y = d.groupby(pd.Grouper(freq='Y')).mean()
+    y_start,y_end = df_y.index[0].year, df_y.index[-1].year
+    df_y.to_csv(f'{fol_out}/yearly/{catch_id}_{y_start}_{y_end}.csv')
+
+    # get mean of timeseries and store as csv
+    if not os.path.exists(f'{fol_out}/mean'):
+         os.makedirs(f'{fol_out}/mean')
+    dm = d.mean()
+    dm.to_csv(f'{fol_out}/mean/{catch_id}_{y_start}_{y_end}.csv')
+
+    
+def run_mswep_processing_function_parallel(
+    catch_list=list,
+    work_dir_list=list,
+    # threads=None
+    threads=100
+):
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        process_mswep_timeseries,
+        catch_list,
+        work_dir_list,
+    )
