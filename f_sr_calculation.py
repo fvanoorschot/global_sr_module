@@ -263,17 +263,17 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir,w
                 out = irri[0] 
                 se_out = irri[1]
                 f = irri[2]
-                se_out.to_csv(f'{out_dir}/irri/f1.85ia/se/{catch_id}_f1.8ia.csv')
-                # se_out.to_csv(f'{out_dir}/irri/fiwu/se/{catch_id}_fiwu.csv')
+                se_out.to_csv(f'{out_dir}/irri/f0.8ia/se/{catch_id}_f0.8ia.csv')
+                # se_out.to_csv(f'{out_dir}/irri/fiwu2/se/{catch_id}_fiwu2.csv')
                 # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}ia.csv')
             
-                out.to_csv(f'{out_dir}/irri/f1.85ia/sd/{catch_id}_f1.8ia.csv')
+                out.to_csv(f'{out_dir}/irri/f0.8ia/sd/{catch_id}_f0.8ia.csv')
                 # out.to_csv(f'{out_dir}/{catch_id}.csv')
-                # out.to_csv(f'{out_dir}/irri/fiwu/sd/{catch_id}_fiwu.csv')
+                # out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
                 # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}ia.csv')
             else: 
-                # out.to_csv(f'{out_dir}/irri/fiwu/sd/{catch_id}_fiwu.csv')
-                out.to_csv(f'{out_dir}/irri/f1.85ia/sd/{catch_id}_f1.8ia.csv')
+                # out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
+                out.to_csv(f'{out_dir}/irri/f0.8ia/sd/{catch_id}_f0.8ia.csv')
 
             return out
         
@@ -293,10 +293,12 @@ def irrigation_sd(df,catch_id,work_dir):
     s2['p_irri']=s.Pe #set initially p irri to Pe
     s2['sd2']=s.Sd
     s2['se2']=s.se
-    iwu = pd.read_csv(f'{work_dir}/output/irrigation/processed/monthly_mean/{catch_id}.csv',index_col=0)
+    iwu = pd.read_csv(f'{work_dir}/output/irrigation/processed2/monthly_mean/{catch_id}.csv',index_col=0)
     iwu_mean = iwu.mean().values[0]*365
-    cc = pd.read_csv(f'{work_dir}/output/catchment_characteristics/gswp-p_gleam-ep_gswp-t/{catch_id}.csv',index_col=0)
-    ir_area = cc.ir_mean.values
+    # cc = pd.read_csv(f'{work_dir}/output/catchment_characteristics/gswp-p_gleam-ep_gswp-t/{catch_id}.csv',index_col=0)
+    # ir_area = cc.ir_mean.values
+    ir2 = pd.read_csv(f'{work_dir}/data/irrigated_area/output/combined_ia.csv',index_col=0) 
+    ir_area = ir2.loc[catch_id].hi
 
     years=len(np.unique(s.index.year)) #count years
     for i in range(years):
@@ -330,7 +332,7 @@ def irrigation_sd(df,catch_id,work_dir):
         # f = 0.17 #
         # f2 = f
         # f based on fixed factor and irrigated area fraction
-        f = 1.85
+        f = 0.8
         f2 = min(f*ir_area, 1) 
         
         # f based on IWU directly
@@ -343,22 +345,22 @@ def irrigation_sd(df,catch_id,work_dir):
         # f2=f
         
         #use this with fia
-        f_ar.append(f2[0]) 
-        if (days>0):
-            irri = f2[0] * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
-            se_used.append(f2[0]*se_sum)
-        else:
-            irri=0
-            se_used.append(0)
-            
-        # use this with fiwu
-        # f_ar.append(f2)
+        # f_ar.append(f2[0]) 
         # if (days>0):
-        #     irri = f2 * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
-        #     se_used.append(f2*se_sum)
+        #     irri = f2[0] * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
+        #     se_used.append(f2[0]*se_sum)
         # else:
         #     irri=0
         #     se_used.append(0)
+            
+        # use this with fiwu
+        f_ar.append(f2)
+        if (days>0):
+            irri = f2 * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
+            se_used.append(f2*se_sum)
+        else:
+            irri=0
+            se_used.append(0)
 
         # add irri to p
         p_irri = dd['Pe'] + irri # preciptiation+irrigation
@@ -401,8 +403,8 @@ def run_sd_calculation_parallel(
     snow_id_list=list,
     snow_dir_list=list,
     work_dir_list=list,
-    # threads=None
-    threads=200
+    threads=None
+    # threads=200
 ):
     """
     Runs function area_weighted_shapefile_rasterstats in parallel.

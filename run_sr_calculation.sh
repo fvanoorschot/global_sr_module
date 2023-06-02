@@ -2,8 +2,9 @@
 #
 #SBATCH --job-name="run_sr_calculation"
 #SBATCH --partition=compute
-#SBATCH --time=24:00:00
-#SBATCH --ntasks=1
+#SBATCH --time=12:00:00
+#SBATCH --ntasks=3
+#SBATCH --nodes=3
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=20G
 #SBATCH --account=research-ceg-wm

@@ -657,7 +657,7 @@ def area_weighted_shapefile_rasterstats_iwu(
     output_csv=True,
     return_cube=False,
     regrid_first=True,
-    grid_resolution=0.1
+    grid_resolution=0.05
 ):
     # Load iris cube of netcdf
     cube = iris.load_cube(catchment_netcdf)
@@ -721,7 +721,7 @@ def run_iwu_function_parallel(
     
     
 def process_iwu_timeseries(catch_id,work_dir):
-    out_fol=f'{work_dir}/output/irrigation/raw/'
+    out_fol=f'{work_dir}/output/irrigation/raw2/'
     # load IWU dataframe
     df = pd.read_csv(f'{out_fol}/{catch_id}.csv',index_col=0)
     df.index = pd.to_datetime(df.index)
@@ -732,8 +732,9 @@ def process_iwu_timeseries(catch_id,work_dir):
     df_mean = pd.DataFrame(index=[catch_id],columns=['iwu_mean_mmday'])
     df_mean['iwu_mean_mmday'] = df_m.mean()
 
-    df_m.to_csv(f'{work_dir}/output/irrigation/processed/monthly_mean/{catch_id}.csv')
-    df_mean.to_csv(f'{work_dir}/output/irrigation/processed/mean/{catch_id}.csv')
+    df.to_csv(f'{work_dir}/output/irrigation/processed2/monthly_mmday/{catch_id}.csv')
+    df_m.to_csv(f'{work_dir}/output/irrigation/processed2/monthly_mean/{catch_id}.csv')
+    df_mean.to_csv(f'{work_dir}/output/irrigation/processed2/mean/{catch_id}.csv')
     
     
 def run_iwu_processing_parallel(

@@ -46,19 +46,19 @@ catch_list = np.genfromtxt(f'{work_dir}/output/gsim_aus_catch_id_list_lo_sel_are
 
 # check which catchments are missing
 el_id_list=[]
-for filepath in glob.iglob(f'{work_dir}/output/sr_calculation/sd_catchments/irri/f1.85ia/sd/*.csv'):
+for filepath in glob.iglob(f'{work_dir}/output/sr_calculation/sd_catchments/irri/f0.8ia/sd/*.csv'):
     f = os.path.split(filepath)[1] # remove full path
-    f = f[:-12] # remove .year extension
+    f = f[:-11] # remove .year extension
     el_id_list.append(f)
 dif = list(set(catch_list) - set(el_id_list))
 print(len(dif))
 catch_list = dif
 
-# # check which catchments are missing
+# check which catchments are missing
 # el_id_list=[]
-# for filepath in glob.iglob(f'{work_dir}/output/sr_calculation/sd_catchments/irri/fiwu/sd/*.csv'):
+# for filepath in glob.iglob(f'{work_dir}/output/sr_calculation/sd_catchments/irri/fiwu2/sd/*.csv'):
 #     f = os.path.split(filepath)[1] # remove full path
-#     f = f[:-9] # remove .year extension
+#     f = f[:-10] # remove .year extension
 #     el_id_list.append(f)
 # dif = list(set(catch_list) - set(el_id_list))
 # print(len(dif))

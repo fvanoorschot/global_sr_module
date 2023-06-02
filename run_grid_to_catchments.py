@@ -41,19 +41,19 @@ print(data_dir)
 # # run function parallel
 # run_cru_function_parallel(shapefile_list, netcdf_list, operator_list, output_dir_list)
 
-# # define directories 
-# nc_bd = f'{work_dir}/data/IWU_irri_data/IWU_2011_2018.nc' # dir of netcdf forcing files
-# out_dir = f'{work_dir}/output/irrigation/raw/' # output dir
-# operator = 'mean'
+# define directories 
+nc_bd = f'{work_dir}/data/IWU_irri_data/IWU_2011_2018.nc' # dir of netcdf forcing files
+out_dir = f'{work_dir}/output/irrigation/raw2/' # output dir
+operator = 'mean'
 
-# shape_dir = Path(f'{work_dir}/output/selected_shapes/')
-# shapefile_list = glob.glob(f'{shape_dir}/*.shp')[:]
+shape_dir = Path(f'{work_dir}/output/selected_shapes/')
+shapefile_list = glob.glob(f'{shape_dir}/*.shp')[:]
 
-# netcdf_list = [nc_bd]*len(shapefile_list)
-# output_dir_list = [out_dir]*len(shapefile_list)
+netcdf_list = [nc_bd]*len(shapefile_list)
+output_dir_list = [out_dir]*len(shapefile_list)
 
-# # run function parallel
-# run_iwu_function_parallel(shapefile_list, netcdf_list, output_dir_list)
+# run function parallel
+run_iwu_function_parallel(shapefile_list, netcdf_list, output_dir_list)
 
 # MSWEP - done on tintin 
 # out_dir = f'{work_dir}/output/raw/' # output dir
@@ -116,15 +116,15 @@ print(data_dir)
 # irri_data = 'AEI_EARTHSTAT_IR_2005'
 # irri_data = 'AEI_EARTHSTAT_CP_2005'
 # irri_data = 'AEI_HYDE_FINAL_CP_2005'
-irri_data = 'AEI_HYDE_FINAL_IR_2005'
-nc = f'{work_dir}/data/irrigated_area/{irri_data}_fraction.nc'
-shape_dir = Path(f'{work_dir}/output/selected_shapes/')
-out_dir =  f'{work_dir}/data/irrigated_area/output/{irri_data}/'
+# irri_data = 'AEI_HYDE_FINAL_IR_2005'
+# nc = f'{work_dir}/data/irrigated_area/{irri_data}_fraction.nc'
+# shape_dir = Path(f'{work_dir}/output/selected_shapes/')
+# out_dir =  f'{work_dir}/data/irrigated_area/output/{irri_data}/'
 
-shape_dir = Path(f'{work_dir}/output/selected_shapes/')
-shapefile_list = glob.glob(f'{shape_dir}/*.shp')[:]
+# shape_dir = Path(f'{work_dir}/output/selected_shapes/')
+# shapefile_list = glob.glob(f'{shape_dir}/*.shp')[:]
 
-netcdf_list = [nc]*len(shapefile_list)
-out_dir_list = [out_dir]*len(shapefile_list)
+# netcdf_list = [nc]*len(shapefile_list)
+# out_dir_list = [out_dir]*len(shapefile_list)
 
-run_irri_area_parallel(shapefile_list, netcdf_list, out_dir_list) # run all catchments as job file
+# run_irri_area_parallel(shapefile_list, netcdf_list, out_dir_list) # run all catchments as job file
