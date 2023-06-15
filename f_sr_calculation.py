@@ -263,132 +263,192 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir,w
                 out = irri[0] 
                 se_out = irri[1]
                 f = irri[2]
-                se_out.to_csv(f'{out_dir}/irri/f0.8ia/se/{catch_id}_f0.8ia.csv')
-                # se_out.to_csv(f'{out_dir}/irri/fiwu2/se/{catch_id}_fiwu2.csv')
+                # se_out.to_csv(f'{out_dir}/irri/f0.8ia/se/{catch_id}_f0.8ia.csv')
+                se_out.to_csv(f'{out_dir}/irri/fiwu2/se/{catch_id}_fiwu2.csv')
                 # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}ia.csv')
             
-                out.to_csv(f'{out_dir}/irri/f0.8ia/sd/{catch_id}_f0.8ia.csv')
+                # out.to_csv(f'{out_dir}/irri/f0.8ia/sd/{catch_id}_f0.8ia.csv')
                 # out.to_csv(f'{out_dir}/{catch_id}.csv')
-                # out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
+                out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
                 # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}ia.csv')
             else: 
-                # out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
-                out.to_csv(f'{out_dir}/irri/f0.8ia/sd/{catch_id}_f0.8ia.csv')
+                out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
+                # out.to_csv(f'{out_dir}/irri/f0.8ia/sd/{catch_id}_f0.8ia.csv')
 
             return out
         
         
 def irrigation_sd(df,catch_id,work_dir):
-    s = df
-    split_dates = []
+    split_dates = [] # dates of annual maximum deficit
     start_date = df.index[0]
-    split_dates.append(start_date)
-    se_l = []
-    se_used = []
-    ldd_l = []
-    lde_l = []
-    days_l = []
-    f_ar = []
+    split_dates.append(start_date) # add start date to split_dates
+
+    se_l = [] # accumulated Se available
+    se_used = [] # used Se
+    ldd_l = [] # last day of deficit
+    lde_l = [] # first day of deficit
+    days_l = [] # amount of deficit days
+    f_ar = [] # f values used
+
     s2 = s #make new dataframe, copy of s which is output of initial sd calculation
-    s2['p_irri']=s.Pe #set initially p irri to Pe
-    s2['sd2']=s.Sd
-    s2['se2']=s.se
-    iwu = pd.read_csv(f'{work_dir}/output/irrigation/processed2/monthly_mean/{catch_id}.csv',index_col=0)
-    iwu_mean = iwu.mean().values[0]*365
-    # cc = pd.read_csv(f'{work_dir}/output/catchment_characteristics/gswp-p_gleam-ep_gswp-t/{catch_id}.csv',index_col=0)
-    # ir_area = cc.ir_mean.values
-    ir2 = pd.read_csv(f'{work_dir}/data/irrigated_area/output/combined_ia.csv',index_col=0) 
-    ir_area = ir2.loc[catch_id].hi
+    s2['p_total'] = np.zeros(len(s2)) # add zeros column of total p = pe+irri
+    s2['p_irri'] = np.zeros(len(s2)) # add zeros column of irri
+    s2['sd2']=s.Sd # set sd2 column intially equal to sd
+    s2['se2']=s.se # set se2 column intially equal to se
+    s2['se_cum'] = np.zeros(len(s2)) # set zeros column for cumulative se
+
+    iwu = pd.read_csv(f'{work_dir}/output/irrigation/processed2/monthly_mean/{catch_id}.csv',index_col=0) # read iwu data
+    iwu_mean = iwu.mean().values[0]*365 # annual mean IWU
+    ir2 = pd.read_csv(f'{work_dir}/data/irrigated_area/output/combined_ia.csv',index_col=0) #read ia data
+    ir_area = ir2.loc[catch_id].hi # irrigated area fraction
+
+    ldd_l.append(s.index[0]) # add first day of timeseries to ldd_l list
 
     years=len(np.unique(s.index.year)) #count years
-    for i in range(years):
-        ss = s2.iloc[i*365:(i*365)+365] #select 1 year
+    # years = 5
+    for i in range(years): # loop over years
+        ss = s2.iloc[i*365:(i*365)+365] #select 1 year from s2 dataframe
         min_date = ss[ss.Sd==ss.Sd.min()].index.values[0] #select date where Sd minimizes
-        split_dates.append(min_date) #append first date to split_dates list
-        sp = s2.loc[split_dates[i]:split_dates[i+1]]
-        se_sum = sp.se2.sum() #sum se from start date to date with min Sd
-        se_l.append(se_sum)
+        split_dates.append(min_date) #append min date to split_dates list
+        sp = s2.loc[split_dates[i]:split_dates[i+1]] # split timeseries from min-date year i until year i+1
 
-        # find last date of Se>0 BEFORE min date = first day deficit
-        sss = ss.loc[:min_date]
-        if (len(sss.se[sss.se>0])>0):
-            lde = sss.se[sss.se>0].index[-1]
-        else:
-            lde = sss.index[0]   
-            
-        # find first day of deficit Sd<0 AFTER min date = last day deficit
-        sss = ss.loc[min_date:]
-        if (len(sss.Sd[sss.Sd<0])>0):
-            ldd = sss[sss.Sd<0].index[-1]
-        else:
-            ldd = sss.Sd.index[-1]
-            
-        ldd_l.append(ldd)
-        lde_l.append(lde)
-        dd = ss.loc[lde+timedelta(days=1):ldd] # select from start of deficit until end of deficit period
+        # find start + end dates of deficit and surplus periods
+        if (i==0): # for first year
+            sss = ss.loc[:min_date] # select timeseries until minimum sd date
+            if (len(sss.se[sss.se>0])>0): 
+                lde = sss.se[sss.se>0].index[-1] # find last day of se>0 before minimum deficit (=start day deficit)
+            else:
+                lde = sss.index[0]   
+
+            ldd_l.append(lde) # append to list
+
+            sss = ss.loc[min_date:] # select timeseries from minimum sd date to end
+            if (len(sss.Sd[sss.Sd==0])>0):
+                ldd = sss[sss.Sd==0].index[0] # find first day of zero deficit after minimum deficit (=end day deficit)
+            else:
+                ldd = sss.Sd.index[-1]
+            ldd_l.append(ldd) # append to list
+        else: # for other years than i=0
+            sss = ss.loc[:min_date] # select timeseries until minimum sd date
+            if (len(sss.se[sss.se>0])>0):
+                lde = sss.se[sss.se>0].index[-1] # find last day of se>0 before minimum deficit (=start day deficit)
+            else:
+                lde = sss.index[0]   
+            ldd_l.append(lde)
+
+            # lde = ldd_l[i]
+            sss = ss.loc[min_date:]  # select timeseries from minimum sd date to end
+            if (len(sss.Sd[sss.Sd==0])>0):
+                ldd = sss[sss.Sd==0].index[0] # find first day of zero deficit after minimum deficit (=end day deficit)
+            else:
+                ldd = sss.Sd.index[-1]
+            # lde_l.append(lde)
+            ldd_l.append(ldd)
+        
+        # get length of irrigation timeseries
+        if (i==0): # first year
+            dd = ss.loc[ldd_l[i+1]+timedelta(days=1):ldd_l[i+2]] # set irrigation period from start deficit until end deficit
+        else: # other years than i=0
+            dd = ss.loc[ldd_l[2*i+1]+timedelta(days=1):ldd_l[2*i+2]] # select from start of deficit until end of deficit period
         days = len(dd) # length of deficit period = length of irrigation period
-        days_l.append(days)
+        days_l.append(days) # append deficit days to days_l list
 
-        # f = 0.17 #
-        # f2 = f
-        # f based on fixed factor and irrigated area fraction
-        f = 0.8
-        f2 = min(f*ir_area, 1) 
-        
-        # f based on IWU directly
-        # if (se_sum>0):
-        #     f = iwu_mean/se_sum
-        # else: 
-        #     f=0
-        # if (f>1):
-        #     f=1
-        # f2=f
-        
-        #use this with fia
-        # f_ar.append(f2[0]) 
+        # accumulate Se for accumulation period
+        dfse2 = pd.DataFrame(index=ss.index,columns=['se','se_cum']) # make new dataframe for year i
+        dfse2['se'] = ss['se2'] # set se to se2 from ss dataset
+        dfse2['se_cum'] = np.zeros(len(ss)) # make zeros se_cum column
+
+        if(i==0): # for first year
+            if (len(dd)>0): # all years except last year
+                cum = dfse2['se'].loc[ldd_l[0]:ldd_l[1]].cumsum() # cumsum of se from start timeseries to start deficit
+                dfse2.se_cum.loc[ldd_l[0]:ldd_l[1]] = cum # add cumsum to dataframe
+
+                dfse2.se_cum.loc[ldd_l[1]:ldd_l[2]] = np.zeros(len(dfse2.se_cum.loc[ldd_l[1]:ldd_l[2]])) # se_cum for deficit period is zero
+
+                cum = dfse2['se'].loc[ldd_l[2]:].cumsum() # cumsum of se from end deficit to end timeseries
+                dfse2.se_cum.loc[ldd_l[2]:] = cum # add cumsum to dataframe       
+
+                s2.se_cum.iloc[i*365:(i*365)+365] = dfse2.se_cum # add cumsum to s2 dataframe
+        else: # other years than i=0
+            if (len(dd)>0): # all years except last year
+                s_index = dfse2.index[0]-timedelta(days=1) # get last day of previous year
+                ss_s = s2.se_cum.loc[s_index] # get se_cum value for last day of previous year
+                cum = dfse2['se'].loc[:ldd_l[2*i+1]].cumsum() + ss_s # cumsum of se from start year to start deficit + se_cum value from last day of previous year
+                dfse2.se_cum.loc[:ldd_l[2*i+1]] = cum # add to dataframe
+
+                dfse2.se_cum.loc[ldd_l[2*i+1]:ldd_l[2*i+2]] = np.zeros(len(dfse2.se_cum.loc[ldd_l[2*i+1]:ldd_l[2*i+2]])) # se_cum for deficit period is zero
+
+                cum = dfse2['se'].loc[ldd_l[2*i+2]:].cumsum() # cumsum of se from end deficit to end timeseries
+                dfse2.se_cum.loc[ldd_l[2*i+2]:] = cum # add cumsum to dataframe         
+
+                s2.se_cum.iloc[i*365:(i*365)+365] = dfse2.se_cum # add cumsum to s2 dataframe
+
+        if (days>0):
+            if (i==0):
+                se_sum = s2.se_cum.loc[ldd_l[i+1]-timedelta(days=1)] # total se is value of se_cum last day before deficit period
+            else:
+                se_sum = s2.se_cum.loc[ldd_l[2*i+1]-timedelta(days=1)] # total se is value of se_cum last day before deficit period  
+                
+        # DEFINE f-VARIABLE
+        # # f based on fixed factor and irrigated area fraction
+        # f = 0.2
+        # f2 = min(f*ir_area, 1) 
+        # f_ar.append(f2) 
         # if (days>0):
-        #     irri = f2[0] * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
-        #     se_used.append(f2[0]*se_sum)
+        #     irri = f2 * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
+        #     se_used.append(f2*se_sum)
         # else:
         #     irri=0
         #     se_used.append(0)
-            
-        # use this with fiwu
-        f_ar.append(f2)
+        # se_l.append(se_sum) # append se_sum to se_l list
+
+        # f based on IWU directly
+        if (se_sum>0):
+            f = iwu_mean/se_sum
+        else: 
+            f=0
+        if (f>1):
+            f=1
+        f2=f
+        f_ar.append(f2)       
         if (days>0):
-            irri = f2 * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
-            se_used.append(f2*se_sum)
+            irri = f2 * se_sum/days # calculate the irrigation rates per day, equally distributed over the deficit period
+            se_used.append(f2*se_sum) # used se is f2*se_sum
         else:
             irri=0
             se_used.append(0)
+        se_l.append(se_sum) # append se_sum to se_l list
 
-        # add irri to p
-        p_irri = dd['Pe'] + irri # preciptiation+irrigation
-        dfp2 = pd.DataFrame(index=ss.index, columns=['p_irri'])
+        # CALCULATE IRRIGATION
+        p_irri = dd['Pe'] + irri # precipitation+irrigation for deficit period
+        dd['irri'] = irri
+
+        dfp2 = pd.DataFrame(index=ss.index, columns=['p_irri']) # make new p-irri dataframe for year i
         dfp2.p_irri = p_irri
-        dfp2 = dfp2.fillna(-1)
-        dfp2.p_irri.loc[dfp2[dfp2.p_irri<0].index] = ss.Pe.loc[dfp2[dfp2.p_irri<0].p_irri.index] # set nan values in dfp2 (no irrigation) to original p values
-        ss['p_irri'] = dfp2['p_irri'] # add p_irri to ss dataframe
-        s2.p_irri.iloc[i*365:(i*365)+365] = ss['p_irri'] #update p_irri in s2
+        dfp2 = dfp2.fillna(-1) # if no irrigation, set to nan
+        dfp2.p_irri.loc[dfp2[dfp2.p_irri<0].index] = ss.Pe.loc[dfp2[dfp2.p_irri<0].p_irri.index] # set nan values (set to -1) in dfp2 (no irrigation) to original p values
+        ss['p_irri'] = dd['irri'] # only irrigation
+        ss['p_irri'] = ss['p_irri'].fillna(0)
+        ss['p_total'] = dfp2['p_irri'] # sum of Pe and irrigation
+        s2.p_total.iloc[i*365:(i*365)+365] = ss['p_total'] #update p_total = irri+pe in s2
+        s2.p_irri.iloc[i*365:(i*365)+365] = ss['p_irri'] #update p_total = irri+pe in s2
 
         #update sd and se in full timeseries from year -> end
         for l in range(i*365,len(s2)):
             if (i==0)&(l==0):
                 s2['sd2'].iloc[l]=0
             else:
-                s2['sd2'].iloc[l] = min(0,s2['sd2'].iloc[l-1]+s2['p_irri'][l]-s2['Et'][l])
+                s2['sd2'].iloc[l] = min(0,s2['sd2'].iloc[l-1]+s2['p_total'][l]-s2['Et'][l])
             if (s2['sd2'].iloc[l]==0):
-                s2['se2'].iloc[l] = s2.p_irri[l]-s2.Et[l]
+                s2['se2'].iloc[l] = s2.p_total[l]-s2.Et[l]
 
     # make irrigation dataframe
-    df_se = pd.DataFrame(index=range(len(se_used)), columns=['start_date_se','end_date_se','start_date_irri','end_date_irri','se','f','se_used','iwu_mean','days_irri'])
+    df_se = pd.DataFrame(index=range(len(se_used)), columns=['start_date_irri','end_date_irri','se','f','se_used','iwu_mean','days_irri'])
     df_se['se'] = se_l
     df_se['se_used'] = se_used
     df_se['f'] = f_ar
-    df_se['start_date_se'] = split_dates[:-1]
-    df_se['end_date_se'] = split_dates[1:]
-    df_se['start_date_irri'] = lde_l
-    df_se['end_date_irri'] = ldd_l
+    df_se['start_date_irri'] = ldd_l[1::2] #odd values
+    df_se['end_date_irri'] = ldd_l[0::2][1:]
     df_se['days_irri'] = days_l
     df_se['iwu_mean'] = [iwu_mean] * len(df_se.index)
     

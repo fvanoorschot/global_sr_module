@@ -44,15 +44,15 @@ irri_ids = np.loadtxt(f'{work_dir}/output/irrigation/catchment_irri_area_5percen
 
 catch_list = np.genfromtxt(f'{work_dir}/output/gsim_aus_catch_id_list_lo_sel_area_wb.txt',dtype='str')[:]
 
-# check which catchments are missing
-el_id_list=[]
-for filepath in glob.iglob(f'{work_dir}/output/sr_calculation/sd_catchments/irri/f0.8ia/sd/*.csv'):
-    f = os.path.split(filepath)[1] # remove full path
-    f = f[:-11] # remove .year extension
-    el_id_list.append(f)
-dif = list(set(catch_list) - set(el_id_list))
-print(len(dif))
-catch_list = dif
+# # check which catchments are missing
+# el_id_list=[]
+# for filepath in glob.iglob(f'{work_dir}/output/sr_calculation/sd_catchments/irri/f0.8ia/sd/*.csv'):
+#     f = os.path.split(filepath)[1] # remove full path
+#     f = f[:-11] # remove .year extension
+#     el_id_list.append(f)
+# dif = list(set(catch_list) - set(el_id_list))
+# print(len(dif))
+# catch_list = dif
 
 # check which catchments are missing
 # el_id_list=[]
@@ -64,7 +64,7 @@ catch_list = dif
 # print(len(dif))
 # catch_list = dif
 
-catch_id_list = catch_list[:]
+catch_id_list = catch_list[0:50]
 pep_dir_list = [pep_dir] * len(catch_id_list)
 q_dir_list = [q_dir] * len(catch_id_list)
 out_dir_list = [out_dir] * len(catch_id_list)
