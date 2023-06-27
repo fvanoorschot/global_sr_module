@@ -263,17 +263,17 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir,w
                 out = irri[0] 
                 se_out = irri[1]
                 f = irri[2]
-                # se_out.to_csv(f'{out_dir}/irri/f0.8ia/se/{catch_id}_f0.8ia.csv')
-                se_out.to_csv(f'{out_dir}/irri/fiwu2/se/{catch_id}_fiwu2.csv')
+                se_out.to_csv(f'{out_dir}/irri/f0.9ia/se/{catch_id}_f0.9ia.csv')
+                # se_out.to_csv(f'{out_dir}/irri/fiwu2/se/{catch_id}_fiwu2.csv')
                 # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}ia.csv')
             
-                # out.to_csv(f'{out_dir}/irri/f0.8ia/sd/{catch_id}_f0.8ia.csv')
+                out.to_csv(f'{out_dir}/irri/f0.9ia/sd/{catch_id}_f0.9ia.csv')
                 # out.to_csv(f'{out_dir}/{catch_id}.csv')
-                out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
+                # out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
                 # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}ia.csv')
             else: 
-                out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
-                # out.to_csv(f'{out_dir}/irri/f0.8ia/sd/{catch_id}_f0.8ia.csv')
+                # out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
+                out.to_csv(f'{out_dir}/irri/f0.9ia/sd/{catch_id}_f0.9ia.csv')
 
             return out
         
@@ -289,12 +289,13 @@ def irrigation_sd(df,catch_id,work_dir):
     lde_l = [] # first day of deficit
     days_l = [] # amount of deficit days
     f_ar = [] # f values used
-
-    s2 = s #make new dataframe, copy of s which is output of initial sd calculation
+    
+    s=df
+    s2 = df #make new dataframe, copy of s which is output of initial sd calculation
     s2['p_total'] = np.zeros(len(s2)) # add zeros column of total p = pe+irri
     s2['p_irri'] = np.zeros(len(s2)) # add zeros column of irri
-    s2['sd2']=s.Sd # set sd2 column intially equal to sd
-    s2['se2']=s.se # set se2 column intially equal to se
+    s2['sd2']=df.Sd # set sd2 column intially equal to sd
+    s2['se2']=df.se # set se2 column intially equal to se
     s2['se_cum'] = np.zeros(len(s2)) # set zeros column for cumulative se
 
     iwu = pd.read_csv(f'{work_dir}/output/irrigation/processed2/monthly_mean/{catch_id}.csv',index_col=0) # read iwu data
@@ -302,7 +303,7 @@ def irrigation_sd(df,catch_id,work_dir):
     ir2 = pd.read_csv(f'{work_dir}/data/irrigated_area/output/combined_ia.csv',index_col=0) #read ia data
     ir_area = ir2.loc[catch_id].hi # irrigated area fraction
 
-    ldd_l.append(s.index[0]) # add first day of timeseries to ldd_l list
+    ldd_l.append(df.index[0]) # add first day of timeseries to ldd_l list
 
     years=len(np.unique(s.index.year)) #count years
     # years = 5
@@ -383,41 +384,47 @@ def irrigation_sd(df,catch_id,work_dir):
 
                 s2.se_cum.iloc[i*365:(i*365)+365] = dfse2.se_cum # add cumsum to s2 dataframe
 
-        if (days>0):
+        if (len(dd)>0):
             if (i==0):
-                se_sum = s2.se_cum.loc[ldd_l[i+1]-timedelta(days=1)] # total se is value of se_cum last day before deficit period
+                if (ldd_l[1]-timedelta(days=1)) in s2.index: # if deficit starts directly, the day before deficit does not exist in the first year dataframe
+                    se_sum = s2.se_cum.loc[ldd_l[1]-timedelta(days=1)] # total se is value of se_cum last day before deficit period
+                else:
+                    se_sum=0
             else:
                 se_sum = s2.se_cum.loc[ldd_l[2*i+1]-timedelta(days=1)] # total se is value of se_cum last day before deficit period  
-                
-        # DEFINE f-VARIABLE
-        # # f based on fixed factor and irrigated area fraction
-        # f = 0.2
-        # f2 = min(f*ir_area, 1) 
-        # f_ar.append(f2) 
-        # if (days>0):
-        #     irri = f2 * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
-        #     se_used.append(f2*se_sum)
-        # else:
-        #     irri=0
-        #     se_used.append(0)
-        # se_l.append(se_sum) # append se_sum to se_l list
+        else:
+            se_sum=0
 
-        # f based on IWU directly
-        if (se_sum>0):
-            f = iwu_mean/se_sum
-        else: 
-            f=0
-        if (f>1):
-            f=1
-        f2=f
-        f_ar.append(f2)       
+
+        # DEFINE f-VARIABLE
+        # f based on fixed factor and irrigated area fraction
+        f = 0.9
+        f2 = min(f*ir_area, 1) 
+        f_ar.append(f2) 
         if (days>0):
-            irri = f2 * se_sum/days # calculate the irrigation rates per day, equally distributed over the deficit period
-            se_used.append(f2*se_sum) # used se is f2*se_sum
+            irri = f2 * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
+            se_used.append(f2*se_sum)
         else:
             irri=0
             se_used.append(0)
         se_l.append(se_sum) # append se_sum to se_l list
+
+        # # f based on IWU directly
+        # if (se_sum>0):
+        #     f = iwu_mean/se_sum
+        # else: 
+        #     f=0
+        # if (f>1):
+        #     f=1
+        # f2=f
+        # f_ar.append(f2)       
+        # if (days>0):
+        #     irri = f2 * se_sum/days # calculate the irrigation rates per day, equally distributed over the deficit period
+        #     se_used.append(f2*se_sum) # used se is f2*se_sum
+        # else:
+        #     irri=0
+        #     se_used.append(0)
+        # se_l.append(se_sum) # append se_sum to se_l list
 
         # CALCULATE IRRIGATION
         p_irri = dd['Pe'] + irri # precipitation+irrigation for deficit period
@@ -463,8 +470,8 @@ def run_sd_calculation_parallel(
     snow_id_list=list,
     snow_dir_list=list,
     work_dir_list=list,
-    threads=None
-    # threads=200
+    # threads=None
+    threads=200
 ):
     """
     Runs function area_weighted_shapefile_rasterstats in parallel.
