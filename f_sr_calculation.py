@@ -604,34 +604,73 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
             sd_hystart_maxvalue = Sd.loc[str(years[i])+'-'+str(date_start_rz_year):sd_max_ix] #timeseries from start rzyear to index of max value
             min_value = min(sd_hystart_maxvalue) #find min value in timeseries before max value
             Sd_maxmin_rz_year.append(sd_max_i-min_value) #append max-min sd per year        
-        
-    # gumbel function
-    def gumbel_r_mom(x):
-        """
-        gumbel extreme value analysis
-        x:        list of max sd values per year
-        returns:  loc and scale of gumbel distribution
-        
-        """
-        scale = np.sqrt(6)/np.pi * np.std(x)
-        loc = np.mean(x) - np.euler_gamma*scale
-        return loc, scale    
 
-    # calculate gumbel parameters
-    # loc1, scale1 = gumbel_r_mom(Sd_maxmin_rz_year)
-    loc1, scale1 = gumbel_r_mom(Sd_maxmin)
+    return(Sd_maxmin)
 
-    # find Sd value corresponding with return period
-    Sd_T = []
-    for i in np.arange(0,len(rp_array),1):
-        p = 1-(1/rp_array[i])
-        y = -np.log(-np.log(p))
-        x = scale1 * y + loc1
-        Sd_T.append(x)
+#     # gumbel function
+#     def gumbel_r_mom(x):
+#         """
+#         gumbel extreme value analysis
+#         x:        list of max sd values per year
+#         returns:  loc and scale of gumbel distribution
+        
+#         """
+#         scale = np.sqrt(6)/np.pi * np.std(x)
+#         loc = np.mean(x) - np.euler_gamma*scale
+#         return loc, scale    
+
+#     # calculate gumbel parameters
+#     # loc1, scale1 = gumbel_r_mom(Sd_maxmin_rz_year)
+#     loc1, scale1 = gumbel_r_mom(Sd_maxmin)
+
+#     # find Sd value corresponding with return period
+#     Sd_T = []
+#     for i in np.arange(0,len(rp_array),1):
+#         p = 1-(1/rp_array[i])
+#         y = -np.log(-np.log(p))
+#         x = scale1 * y + loc1
+#         Sd_T.append(x)
          
-    return(Sd_T)   
+#     return(Sd_T)   
 
-       
+
+def gumbel(Sd_maxmin):
+    m = len(Sd_maxmin)
+    df = pd.DataFrame(index=np.arange(1,len(Sd_maxmin)+1,1),columns=['sd','i','p','q','y'])
+    df['sd'] = Sd_maxmin
+    df = df.sort_values('sd',ascending=False)
+    df['i'] = np.arange(1,len(Sd_maxmin)+1,1)
+    df['p'] = df['i']/(m+1)
+    df['q'] = 1-df['p']
+    df['y'] = -np.log(-np.log(df['q']))
+
+    # exercise: compute Gumbel parameters (name them sigma and mu)
+    s_R = df['sd'].std()
+    s_y = df['y'].std()
+    y_gem = df['y'].mean()
+    R_max_gem = df['sd'].mean()
+    sigma = s_R / s_y
+    mu = R_max_gem - s_R * (y_gem / s_y)
+
+    # Now we can construct the Gumbel fit and plot the Gumbel line
+    dummy_y = np.arange(-2,6.01,0.2)
+    R_Gumbel = sigma * dummy_y + mu
+
+    # Here we define the return periods and we inspect the difference between the two return periods
+    T_interest = np.asarray([1,2,3,5,10,20,30,40,50,60,70,80])
+    T_a_interest = 1 / (1-np.exp(-1/T_interest))
+
+    # real return period for the observed annual maxima
+    T_a = 1 / df.p
+    df.loc[:,'T_a'] = T_a
+    T = -1 / np.log(1 - 1/df['T_a'].values)
+    df.loc[:,'T'] = T
+
+    # exercise, Gumbel estimate for return period array T_interest
+    gumbel_estimate = sigma * (-np.log(1/T_interest)) + mu
+    
+    return(df,T_interest,gumbel_estimate)
+
 ## 6
 def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f):
     """
@@ -667,13 +706,18 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f):
 
         if ((year_end-year_start)>10) and (sd_table.Et.max()>0):#only if our timeseries is longer than 10years and Et is not nan
             # calculate sr for different return periods using (4)
-            sr_T = sr_return_periods_minmax_rzyear(rp_array, Sd, year_start, year_end, date_start, date_end)
+            sd_maxmin = sr_return_periods_minmax_rzyear(rp_array, Sd, year_start, year_end, date_start, date_end)
+            
+            # get oberved extremes as points
+            df = gumbel(sd_maxmin)[0]
+            df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}_points.csv')
 
-            # store dataframe with catchment sr values
-            sr_df = pd.DataFrame(index=[catch_id], columns=rp_array)
-            sr_df.loc[catch_id]=sr_T
-
-            sr_df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}.csv')
+            # get gumbel fit for different T
+            T_interest = gumbel(sd_maxmin)[1]
+            gumbel_estimate = gumbel(sd_maxmin)[2]
+            sr_df = pd.DataFrame(index=[catch_id], columns=T_interest)
+            sr_df.loc[catch_id]=gumbel_estimate
+            sr_df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}_gumbelfit.csv')
 
             return(sr_df)
 

@@ -26,7 +26,8 @@ from statsmodels.tools import add_constant
 
 from f_sr_calculation import *
 
-work_dir=Path("/scratch/fransjevanoors/global_sr")
+# work_dir=Path("/scratch/fransjevanoors/global_sr")
+work_dir=Path("/mnt/u/LSM root zone/global_sr")
 #work_dir=Path('/tudelft.net/staff-umbrella/LSM root zone/global_sr')
 data_dir=Path(f'{work_dir}/data')
 out_dir = Path(f"{work_dir}/output")
