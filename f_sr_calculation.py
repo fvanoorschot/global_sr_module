@@ -684,42 +684,80 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f):
     returns:    sr_df, dataframe with sr for catchment, stored as csv
     
     """
-    # check if sd exists for catchment id
-    if(os.path.exists(f'{sd_dir}/irri/f{f}/sd/{catch_id}_f{f}.csv')==True):  
-        
-        # read storage deficit table
-        sd_table = pd.read_csv(f'{sd_dir}/irri/f{f}/sd/{catch_id}_f{f}.csv',index_col=0)
-        sd_table.index = pd.to_datetime(sd_table.index)
+    if (f=='no_irri'):
+        # check if sd exists for catchment id
+        if(os.path.exists(f'{sd_dir}/no_irri/sd/{catch_id}.csv')==True):  
 
-        # get sd, start and end year and date from sd_table
-        if 'sd2' in sd_table.columns:
-            Sd = sd_table.sd2
-        else:
-            Sd = sd_table.Sd
+            # read storage deficit table
+            sd_table = pd.read_csv(f'{sd_dir}/no_irri/sd/{catch_id}.csv',index_col=0)
+            sd_table.index = pd.to_datetime(sd_table.index)
 
-        year_start = sd_table.index[0].year
-        year_end = sd_table.index[-1].year
-        date_start = str(sd_table.index[0].month)+'-'+str(sd_table.index[0].day)
-        date_end = str(sd_table.index[-1].month)+'-'+str(sd_table.index[-1].day)
-        if(date_end=='2-29'):
-            date_end='2-28'
+            # get sd, start and end year and date from sd_table
+            if 'sd2' in sd_table.columns:
+                Sd = sd_table.sd2
+            else:
+                Sd = sd_table.Sd
 
-        if ((year_end-year_start)>10) and (sd_table.Et.max()>0):#only if our timeseries is longer than 10years and Et is not nan
-            # calculate sr for different return periods using (4)
-            sd_maxmin = sr_return_periods_minmax_rzyear(rp_array, Sd, year_start, year_end, date_start, date_end)
-            
-            # get oberved extremes as points
-            df = gumbel(sd_maxmin)[0]
-            df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}_points.csv')
+            year_start = sd_table.index[0].year
+            year_end = sd_table.index[-1].year
+            date_start = str(sd_table.index[0].month)+'-'+str(sd_table.index[0].day)
+            date_end = str(sd_table.index[-1].month)+'-'+str(sd_table.index[-1].day)
+            if(date_end=='2-29'):
+                date_end='2-28'
 
-            # get gumbel fit for different T
-            T_interest = gumbel(sd_maxmin)[1]
-            gumbel_estimate = gumbel(sd_maxmin)[2]
-            sr_df = pd.DataFrame(index=[catch_id], columns=T_interest)
-            sr_df.loc[catch_id]=gumbel_estimate
-            sr_df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}_gumbelfit.csv')
+            if ((year_end-year_start)>10) and (sd_table.Et.max()>0):#only if our timeseries is longer than 10years and Et is not nan
+                # calculate sr for different return periods using (4)
+                sd_maxmin = sr_return_periods_minmax_rzyear(rp_array, Sd, year_start, year_end, date_start, date_end)
 
-            return(sr_df)
+                # get observed extremes as points
+                df = gumbel(sd_maxmin)[0]
+                df.to_csv(f'{sd_dir}/no_irri/sr/{catch_id}_points.csv')
+
+                # get gumbel fit for different T
+                T_interest = gumbel(sd_maxmin)[1]
+                gumbel_estimate = gumbel(sd_maxmin)[2]
+                sr_df = pd.DataFrame(index=[catch_id], columns=T_interest)
+                sr_df.loc[catch_id]=gumbel_estimate
+                sr_df.to_csv(f'{sd_dir}/no_irri/sr/{catch_id}_gumbelfit.csv')
+                return(sr_df)
+    
+    else:
+        # check if sd exists for catchment id
+        if(os.path.exists(f'{sd_dir}/irri/f{f}/sd/{catch_id}_f{f}.csv')==True):  
+
+            # read storage deficit table
+            sd_table = pd.read_csv(f'{sd_dir}/irri/f{f}/sd/{catch_id}_f{f}.csv',index_col=0)
+            sd_table.index = pd.to_datetime(sd_table.index)
+
+            # get sd, start and end year and date from sd_table
+            if 'sd2' in sd_table.columns:
+                Sd = sd_table.sd2
+            else:
+                Sd = sd_table.Sd
+
+            year_start = sd_table.index[0].year
+            year_end = sd_table.index[-1].year
+            date_start = str(sd_table.index[0].month)+'-'+str(sd_table.index[0].day)
+            date_end = str(sd_table.index[-1].month)+'-'+str(sd_table.index[-1].day)
+            if(date_end=='2-29'):
+                date_end='2-28'
+
+            if ((year_end-year_start)>10) and (sd_table.Et.max()>0):#only if our timeseries is longer than 10years and Et is not nan
+                # calculate sr for different return periods using (4)
+                sd_maxmin = sr_return_periods_minmax_rzyear(rp_array, Sd, year_start, year_end, date_start, date_end)
+
+                # get oberved extremes as points
+                df = gumbel(sd_maxmin)[0]
+                df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}_points.csv')
+
+                # get gumbel fit for different T
+                T_interest = gumbel(sd_maxmin)[1]
+                gumbel_estimate = gumbel(sd_maxmin)[2]
+                sr_df = pd.DataFrame(index=[catch_id], columns=T_interest)
+                sr_df.loc[catch_id]=gumbel_estimate
+                sr_df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}_gumbelfit.csv')
+
+                return(sr_df)
 
     
 def run_sr_calculation_parallel(
