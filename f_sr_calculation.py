@@ -154,7 +154,7 @@ def sd_initial(df, si_0, si_max, q_mean,s):
     return b, df
 
 ## 2
-def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir,work_dir):
+def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir,work_dir,ir_case):
     """
     run calculation of storage deficits (1)
     
@@ -255,30 +255,30 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir,w
         if b==0:      
             # save output dataframe from sd calculation
             out = sd_initial(sd_input, si_0, si_max, q_mean,s)[1]
-            
-            # if catch_id in irri_id_list:
-            # if ir_area>0.01:
-            if ir_area>0:
-                irri = irrigation_sd(out,catch_id,work_dir)
-                out = irri[0] 
-                se_out = irri[1]
-                f = irri[2]
-                se_out.to_csv(f'{out_dir}/irri/f0.9ia/se/{catch_id}_f0.9ia.csv')
-                # se_out.to_csv(f'{out_dir}/irri/fiwu2/se/{catch_id}_fiwu2.csv')
-                # se_out.to_csv(f'{out_dir}/irri/se/{catch_id}_f{f}ia.csv')
-            
-                out.to_csv(f'{out_dir}/irri/f0.9ia/sd/{catch_id}_f0.9ia.csv')
-                # out.to_csv(f'{out_dir}/{catch_id}.csv')
-                # out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
-                # out.to_csv(f'{out_dir}/irri/sd/{catch_id}_f{f}ia.csv')
-            else: 
-                # out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
-                out.to_csv(f'{out_dir}/irri/f0.9ia/sd/{catch_id}_f0.9ia.csv')
+            if (ir_case=='ni'):
+                out.to_csv(f'{out_dir}/no_irri/sd/{catch_id}.csv')
+            else:
+                if ir_area>0:
+                    ir = irrigation_sd(out,catch_id,work_dir,ir_case)
+                    out = ir[0] 
+                    se_out = ir[1]
+                    f = ir[2]
+                    if (ir_case=='iaf'):
+                        se_out.to_csv(f'{out_dir}/irri/f0.9ia/se/{catch_id}_f0.9ia.csv')
+                        out.to_csv(f'{out_dir}/irri/f0.9ia/sd/{catch_id}_f0.9ia.csv')
+                    if (ir_case=='iwu'):
+                        se_out.to_csv(f'{out_dir}/irri/fiwu2/se/{catch_id}_fiwu2.csv')
+                        out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
+                else: 
+                    if (ir_case=='iaf'):
+                        out.to_csv(f'{out_dir}/irri/f0.9ia/sd/{catch_id}_f0.9ia.csv')
+                    if (ir_case=='iwu'):
+                        out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
 
             return out
         
         
-def irrigation_sd(df,catch_id,work_dir):
+def irrigation_sd(df,catch_id,work_dir,ir_case):
     split_dates = [] # dates of annual maximum deficit
     start_date = df.index[0]
     split_dates.append(start_date) # add start date to split_dates
@@ -397,34 +397,36 @@ def irrigation_sd(df,catch_id,work_dir):
 
 
         # DEFINE f-VARIABLE
-        # f based on fixed factor and irrigated area fraction
-        f = 0.9
-        f2 = min(f*ir_area, 1) 
-        f_ar.append(f2) 
-        if (days>0):
-            irri = f2 * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
-            se_used.append(f2*se_sum)
-        else:
-            irri=0
-            se_used.append(0)
-        se_l.append(se_sum) # append se_sum to se_l list
-
-        # # f based on IWU directly
-        # if (se_sum>0):
-        #     f = iwu_mean/se_sum
-        # else: 
-        #     f=0
-        # if (f>1):
-        #     f=1
-        # f2=f
-        # f_ar.append(f2)       
-        # if (days>0):
-        #     irri = f2 * se_sum/days # calculate the irrigation rates per day, equally distributed over the deficit period
-        #     se_used.append(f2*se_sum) # used se is f2*se_sum
-        # else:
-        #     irri=0
-        #     se_used.append(0)
-        # se_l.append(se_sum) # append se_sum to se_l list
+        if (ir_case=='iaf'):
+            # f based on fixed factor and irrigated area fraction
+            f = 0.9
+            f2 = min(f*ir_area, 1) 
+            f_ar.append(f2) 
+            if (days>0):
+                irri = f2 * se_sum/days # calculate the irrigation fraction per day, equally distributed over the deficit period
+                se_used.append(f2*se_sum)
+            else:
+                irri=0
+                se_used.append(0)
+            se_l.append(se_sum) # append se_sum to se_l list
+        
+        if (ir_case=='iwu'):
+            # f based on IWU directly
+            if (se_sum>0):
+                f = iwu_mean/se_sum
+            else: 
+                f=0
+            if (f>1):
+                f=1
+            f2=f
+            f_ar.append(f2)       
+            if (days>0):
+                irri = f2 * se_sum/days # calculate the irrigation rates per day, equally distributed over the deficit period
+                se_used.append(f2*se_sum) # used se is f2*se_sum
+            else:
+                irri=0
+                se_used.append(0)
+            se_l.append(se_sum) # append se_sum to se_l list
 
         # CALCULATE IRRIGATION
         p_irri = dd['Pe'] + irri # precipitation+irrigation for deficit period
@@ -470,6 +472,7 @@ def run_sd_calculation_parallel(
     snow_id_list=list,
     snow_dir_list=list,
     work_dir_list=list,
+    ir_case_list=list,
     # threads=None
     threads=200
 ):
@@ -500,28 +503,10 @@ def run_sd_calculation_parallel(
         out_dir_list,
         snow_id_list,
         snow_dir_list,
-        work_dir_list
+        work_dir_list,
+        ir_case_list
     )
-        
-## 4
-def plot_sd(catch_id, sd_dir):
-    """
-    plot timeseries of storage deficits for catchment catch id
-    catch_id:   str, catchment id
-    sd_dir:     str, dir, directory where you find the sd table from (2)
-    
-    returns:    None, shows figure of sd
-    """
-    df = pd.read_csv(f'{sd_dir}/{catch_id}.csv',index_col=0)
-    df.index = pd.to_datetime(df.index)
-    
-    fig = plt.figure(figsize=(6,3))
-    ax = fig.add_subplot(111)
-    ax.plot(df.index, df.Sd*-1)
-    ax.set_ylim(300,0)
-    ax.set_ylabel('storage deficit (mm)')
-    ax.set_title(f'catchment {catch_id}')
-            
+                   
             
 def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,date_end):
     """
@@ -672,7 +657,7 @@ def gumbel(Sd_maxmin):
     return(df,T_interest,gumbel_estimate)
 
 ## 6
-def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f):
+def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,ir_case):
     """
     run sr calculation
     
@@ -680,11 +665,12 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f):
     rp_array:   int, array, array of return periods
     sd_dir:     str, dir, directory with sd dataframes
     out_dir:    str, dir, output directory
+    ir_case:    str, irrigation case 'ni', 'iaf', or 'iwu'
     
     returns:    sr_df, dataframe with sr for catchment, stored as csv
     
     """
-    if (f=='no_irri'):
+    if (ir_case=='ni'):
         # check if sd exists for catchment id
         if(os.path.exists(f'{sd_dir}/no_irri/sd/{catch_id}.csv')==True):  
 
@@ -722,6 +708,10 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,f):
                 return(sr_df)
     
     else:
+        if (ir_case=='iwu'):
+            f='iwu2'
+        if (ir_case=='iaf'):
+            f='0.9ia'
         # check if sd exists for catchment id
         if(os.path.exists(f'{sd_dir}/irri/f{f}/sd/{catch_id}_f{f}.csv')==True):  
 
@@ -765,7 +755,7 @@ def run_sr_calculation_parallel(
     rp_array_list=list,
     sd_dir_list=list,
     out_dir_list=list,
-    f_list = list,
+    ir_case_list=list,
     # threads=None
     threads=100
 ):
@@ -792,7 +782,7 @@ def run_sr_calculation_parallel(
         rp_array_list,
         sd_dir_list,
         out_dir_list,
-        f_list,
+        ir_case_list,
     )
 
 ## 7
