@@ -20,6 +20,8 @@ from scipy.optimize import least_squares
 import geopandas as gpd
 from pathos.threading import ThreadPool as Pool
 from scipy.optimize import minimize
+from datetime import datetime
+from datetime import timedelta
 
 ## 1
 def p_mean(df):
@@ -51,11 +53,11 @@ def t_mean(df):
 
 def ai(df):
     """
-    calculate aridity index (P/Ep)
+    calculate aridity index (Ep/P)
     df: pandas dataframe, P and Ep timeseries
     returns: aridity index AI [-]
     """
-    ai = df['p'].mean()/df['ep'].mean()
+    ai = df['ep'].mean()/df['p'].mean()
     return ai
 
 def hai(df):
@@ -487,15 +489,47 @@ def seas_var_indices(df):
 
     return de,dp,dt,sp,st,se,sd,sti
 
+# calculate asynchronity index of p and ep - Feng 2019
+def asi(df):
+    p = df.p
+    ep = df.ep
+    p_monthly = p.groupby(pd.Grouper(freq="M")).sum()
+    pm = p_monthly.groupby([p_monthly.index.month]).mean()
+    ep_monthly = ep.groupby(pd.Grouper(freq="M")).sum()
+    epm = ep_monthly.groupby([p_monthly.index.month]).mean()
 
-def catch_characteristics_climate(var_cl, catch_id,work_dir,data_sources):
-    """
-    calculate catchment characteristics - climate variables
-    var_cl: define list of climate variables
-    catch_id: catchment id
-    data_sources: combination of data used for P, Ep and T (gswp-p_gleam-ep_gswp-t for example)
-    returns: dataframe with climate variables for catchment
-    """
+    ppm = pm/pm.sum()
+    pepm = epm/epm.sum()
+    asi_var = get_synchronicity(ppm,pepm)
+    return asi_var
+
+def get_JSDiv(prcp_pdf, temp_pdf):    
+    M = 0.5*(temp_pdf + prcp_pdf)
+    pre = prcp_pdf[prcp_pdf>0]; M1 = M[prcp_pdf>0]
+    tmp = temp_pdf[temp_pdf>0]; M2 = M[temp_pdf>0]
+    DivRM = np.sum(pre * np.log2(pre/M1))
+    DivPM = np.sum(tmp * np.log2(tmp/M2))
+    JSDiv = np.round( 0.5*(DivRM + DivPM), 10)
+    return JSDiv 
+
+def get_synchronicity(prcp_pdf, temp_pdf):
+    JSDiv_m = np.zeros(12)
+    for m_shift in range(12): 
+        temp_rolled = np.roll(temp_pdf, m_shift)
+        JSDiv_m[m_shift] = get_JSDiv(prcp_pdf, temp_rolled)
+    diffJSDiv = np.sqrt( JSDiv_m[0] - np.min(JSDiv_m) ) 
+    return diffJSDiv    
+    
+def cvp(df):
+    p = df.p
+    p_annual = p.groupby(pd.Grouper(freq="Y")).sum()
+    ps = p_annual.std()
+    pa = p_annual.mean()
+    cvp_var = ps/pa
+    return cvp_var
+
+# combine climate catch characteristics
+def catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources):
     cc_cl = pd.DataFrame(index=[catch_id], columns=var_cl)
     j = catch_id
     if (data_sources=='gswp-p_gleam-ep_gswp-t'):
@@ -506,6 +540,32 @@ def catch_characteristics_climate(var_cl, catch_id,work_dir,data_sources):
     l_q = glob.glob(f'{work_dir}/output/q_timeseries_selected/{j}*.csv') # find discharge data for catchment
     df_q = pd.read_csv(l_q[0], index_col=0)
     df_q.index = pd.to_datetime(df_q.index)
+
+    # find longest timeseries for Q and P-T-Ep
+    p_ep_start_year = df.index.year[0]
+    q_start_year = int(df_q.index[0].year)
+    p_ep_end_year = df.index.year[-1]
+    q_end_year = int(df_q.index[-1].year)
+
+    if q_start_year>p_ep_end_year:
+        a=1
+    elif p_ep_start_year>q_end_year:
+        a=1
+    else:
+        a=0
+        start_year = max(q_start_year,p_ep_start_year)
+        end_year = min(q_end_year,p_ep_end_year)
+        start_date = datetime(start_year,1,1)
+        start_date_q = datetime(start_year,12,31)
+        end_date = datetime(end_year,12,31)
+
+    cc_cl['start_year'] = start_year
+    cc_cl['end_year'] = end_year
+    cc_cl['years'] = end_year-start_year
+
+    # select matching timeseries
+    df_q = df_q.loc[start_date_q:end_date]
+    df = df.loc[start_date:end_date]
 
     # calculate catchment characteristics using functions in (1)
     if 'p_mean' in var_cl:
@@ -559,106 +619,15 @@ def catch_characteristics_climate(var_cl, catch_id,work_dir,data_sources):
 
     if 'sti' in var_cl:
         cc_cl.loc[j,['de','dp','dt','sp','st','se','sd','sti']] = seas_var_indices(df)
+    
+    if 'asi' in var_cl:
+        cc_cl.loc[j,'asi'] = asi(df)
         
-    return cc_cl
-
-def catch_characteristics_landscape(var_lc,catch_id,work_dir):
-    """
-    calculate catchment characteristics - landscape variables
-    var_lc: define list of landscape variables
-    catch_id: catchment id
-    returns: dataframe with landscape variables for catchment
-    """
-    cc_lc = pd.DataFrame(index=[catch_id], columns=var_lc)
-    j = catch_id
-
-    if 'tc' in var_lc:
-        dft = pd.read_csv(f'{work_dir}/output/treecover/gsim_shapes_treecover.csv',index_col=0) #find treecover tables for catchment
-        cc_lc.loc[j,'tc'] = dft.loc[j,'mean_tc'] /100
-        cc_lc.loc[j,'ntc'] = dft.loc[j,'mean_ntc']/100
-        cc_lc.loc[j,'nonveg'] = dft.loc[j,'mean_nonveg']/100
-
-    if 'area' in var_lc:
-        a = pd.read_csv(f'{work_dir}/output/catchment_area.csv',index_col=0)
-        cc_lc.loc[j,'area'] = a.loc[j,'area']
-        
-    if 'el_mean' in var_lc:
-        e = pd.read_csv(f'{work_dir}/output/elevation/stats_hydrosheds/ele_{j}.csv',index_col=0)
-        e.index = e.index.map(str)
-        cc_lc.loc[j,'el_mean'] = e.loc[j,'mean_ele']
-        cc_lc.loc[j,'el_max'] = e.loc[j,'max_ele']
-        cc_lc.loc[j,'el_min'] = e.loc[j,'min_ele']
-        cc_lc.loc[j,'el_std'] = e.loc[j,'std_ele']
-    if 'slp_mean' in var_lc:
-        e = pd.read_csv(f'{work_dir}/output/elevation/stats_hydrosheds/slope_{j}.csv',index_col=0)
-        e.index = e.index.map(str)
-        cc_lc.loc[j,'slp_mean'] = e.loc[j,'mean_slope']
-        cc_lc.loc[j,'slp_max'] = e.loc[j,'max_slope']
-        cc_lc.loc[j,'slp_min'] = e.loc[j,'min_slope']
-        cc_lc.loc[j,'slp_std'] = e.loc[j,'std_slope']
-    if 'iwu' in var_lc:
-        e = pd.read_csv(f'{work_dir}/output/irrigation/processed/mean/{j}.csv',index_col=0)
-        e.index = e.index.map(str)
-        cc_lc.loc[j,'iwu'] = e.loc[j,'iwu_mean_mmday']
-    if 'bp' in var_lc:
-        e = pd.read_csv(f'{work_dir}/output/bedrock_depth/0_01deg/{j}.csv',index_col=0)
-        e.index = e.index.map(str)
-        cc_lc.loc[j,'bp'] = e.loc[j,'bd_perc']
-    if 'dtb' in var_lc:
-        e = pd.read_csv(f'{work_dir}/output/bedrock_depth/0_05deg/{j}.csv',index_col=0)
-        e.index = e.index.map(str)
-        cc_lc.loc[j,'dtb'] = e.loc[j,'bd_mean']
-
-    # add gsim variables
-    df_gsim = pd.read_csv(f'{work_dir}/data/GSIM_data/GSIM_metadata/GSIM_catalog/GSIM_catchment_characteristics.csv',index_col=0)
-    k = j.upper()
-    if k in df_gsim.index.values:
-        if 'ir_mean' in var_lc:
-            cc_lc.loc[j,'ir_mean'] = df_gsim.loc[k,'ir.mean']
-        if 'drd' in var_lc:
-            cc_lc.loc[j,'drd'] = df_gsim.loc[k,'dr.mean']
-        if 'cla' in var_lc:
-            cc_lc.loc[j,'cla'] = df_gsim.loc[k,'scl.mean']
-        if 'snd' in var_lc:
-            cc_lc.loc[j,'snd'] = df_gsim.loc[k,'snd.mean']
-        if 'slt' in var_lc:
-            cc_lc.loc[j,'slt'] = df_gsim.loc[k,'slt.mean']
-        if 'tpi' in var_lc:
-            cc_lc.loc[j,'tpi'] = df_gsim.loc[k,'tp.mean']
-        if 'lc' in var_lc:
-            cc_lc.loc[j,'lc'] = df_gsim.loc[k,'landcover.type']
-        if 'lit' in var_lc:
-            cc_lc.loc[j,'lit'] = df_gsim.loc[k,'lithology.type']
-        if 'pop' in var_lc:
-            cc_lc.loc[j,'pop'] = df_gsim.loc[k,'pop.count']
-        if 'pd' in var_lc:
-            cc_lc.loc[j,'pd'] = df_gsim.loc[k,'pd.mean']
-        if 'st' in var_lc:
-            cc_lc.loc[j,'st'] = df_gsim.loc[k,'soil.type']
-        if 'nld' in var_lc:
-            cc_lc.loc[j,'nld'] = df_gsim.loc[k,'nl.mean']
-        if 'ds' in var_lc:
-            cc_lc.loc[j,'ds'] = df_gsim.loc[k,'no.dams']
-        if 'dv' in var_lc:
-            cc_lc.loc[j,'dv'] = df_gsim.loc[k,'sto.volume']
-        if 'clt' in var_lc:
-            cc_lc.loc[j,'clt'] = df_gsim.loc[k,'climate.type']
-    else:
-        # use aus information
-        df_aus = pd.read_csv(f'{work_dir}/data/CAMELS_AUS/CAMELS_AUS_Attributes-Indices_MasterTable.csv',index_col=0)
-        cc_lc.loc[j,['drd','cla','snd']] = df_aus.loc[j,['strdensity','claya','sanda']].values  
-        cc_lc.loc[j,['ir_mean','slt','tpi','lc','lit','pop','pd','st','nld','ds','dv','clt']] = np.nan # not available for camels aus   
-    return cc_lc
-
-def catch_characteristics_climate_snow(var_sn, catch_id,work_dir,data_sources):
-    """
-    calculate catchment characteristics - climate variables using liquid input for snow catchments
-    var_snow: define list of snow-climate variables
-    catch_id: catchment id
-    data_sources: combination of data used for P, Ep and T (gswp-p_gleam-ep_gswp-t for example)
-    returns: dataframe with snow-climate variables for catchment
-    """
-    snow_list=np.genfromtxt(f'{work_dir}/output/snow/catch_id_list_snow_t_and_p.txt',dtype='str')
+    if 'cvp' in var_cl:
+        cc_cl.loc[j,'cvp'] = cvp(df)
+    
+    # SNOW
+    snow_list=np.genfromtxt(f'{work_dir}/output/snow/catch_id_list_snow_t_and_p_italy.txt',dtype='str')
     cc_sn = pd.DataFrame(index=[catch_id], columns=var_sn)
     j = catch_id
     if (data_sources=='gswp-p_gleam-ep_gswp-t'):
@@ -667,6 +636,7 @@ def catch_characteristics_climate_snow(var_sn, catch_id,work_dir,data_sources):
             l = glob.glob(f'{work_dir}/output/snow/timeseries_{pdata}/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment liquid input
             df = pd.read_csv(l[0], index_col=0)
             df.index = pd.to_datetime(df.index)
+            df = df.loc[start_date:end_date]
 
             # set df p column to df pl 
             df['p']=df['pl']
@@ -695,11 +665,15 @@ def catch_characteristics_climate_snow(var_sn, catch_id,work_dir,data_sources):
 
             if 'sti_l' in var_sn:
                 cc_sn.loc[j,['de_l','dp_l','dt_l','sp_l','st_l','se_l','sd_l','sti_l']] = seas_var_indices(df)
+                
+            if 'asi_l' in var_sn:
+                cc_sn.loc[j,'asi_l'] = asi(df)
 
         else: # if no snow, then liquid p variables same as normal p variables
             l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
             df = pd.read_csv(l[0], index_col=0)
             df.index = pd.to_datetime(df.index)
+            df = df.loc[start_date:end_date]
 
             # calculate catchment characteristics using functions in (1)
             if 'si_pl' in var_sn:
@@ -725,30 +699,25 @@ def catch_characteristics_climate_snow(var_sn, catch_id,work_dir,data_sources):
 
             if 'sti_l' in var_sn:
                 cc_sn.loc[j,['de_l','dp_l','dt_l','sp_l','st_l','se_l','sd_l','sti_l']] = seas_var_indices(df)
+            
+            if 'asi_l' in var_sn:
+                cc_sn.loc[j,'asi_l'] = asi(df)
         
-    return cc_sn
+        cc = pd.concat([cc_cl,cc_sn],axis=1)
+        
+        return cc
 
-def catch_characteristics(var_lc,var_cl,var_sn, catch_id, work_dir,data_sources):
+
+def catch_characteristics(var_cl,var_sn, catch_id, work_dir,data_sources):
     """
-    combine climate and landscape variables in one dataframe
+    combine climate and snow variables in one dataframe
     returns: catchment characteristics dataframe cc - saved as csv file
     """
-    cc_lc = catch_characteristics_landscape(var_lc,catch_id,work_dir)
-    cc_cl = catch_characteristics_climate(var_cl, catch_id,work_dir,data_sources)
-    cc_sn = catch_characteristics_climate_snow(var_sn, catch_id,work_dir,data_sources)
-    cc = pd.concat([cc_cl,cc_sn,cc_lc],axis=1)
-    
-    # merge with existing dataframe
-    if os.path.exists(f'{work_dir}/output/catchment_characteristics/{data_sources}/{catch_id}.csv'):
-        cce = pd.read_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/{catch_id}.csv',index_col=0)
-        cc2 = pd.concat([cc,cce],axis=1)
-    else: 
-        cc2 = cc
-    cc2.to_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/{catch_id}.csv') #store cc dataframe
-    
+    cc = catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
+    cc.to_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/climate/{catch_id}.csv') #store cc dataframe
 
+    
 def run_function_parallel_catch_characteristics(
-    var_lc_list=list,
     var_cl_list=list,
     var_sn_list=list,
     catch_list=list,
@@ -761,7 +730,6 @@ def run_function_parallel_catch_characteristics(
     Runs function preprocess_gsim_discharge  in parallel.
 
     var_cl_list: str,list, list of climate variables
-    var_lc_list: str,list, list of landscape variables
     var_sn_list: str,list, list of climate snow variables
     catch_list:  str, list, list of catchmet ids
     work_dir_list:     str, list, list of work dir
@@ -778,13 +746,167 @@ def run_function_parallel_catch_characteristics(
     # Run parallel models
     results = pool.map(
         catch_characteristics,
-        var_lc_list,
         var_cl_list,
         var_sn_list,
         catch_list,
         work_dir_list,
         data_sources_list,
     )
+    
+    
+    
+def catch_characteristics_landscape(var_lc,catch_id,work_dir):
+    """
+    calculate catchment characteristics - landscape variables
+    var_lc: define list of landscape variables
+    catch_id: catchment id
+    returns: dataframe with landscape variables for catchment
+    """
+    cc_lc = pd.DataFrame(index=[catch_id], columns=var_lc)
+    j = catch_id
+
+    if 'tc' in var_lc:
+        dft = pd.read_csv(f'{work_dir}/output/treecover/gsim_shapes_treecover_italy.csv',index_col=0) #find treecover tables for catchment
+        cc_lc.loc[j,'tc'] = dft.loc[j,'mean_tc'] /100
+        cc_lc.loc[j,'ntc'] = dft.loc[j,'mean_ntc']/100
+        cc_lc.loc[j,'nonveg'] = dft.loc[j,'mean_nonveg']/100
+
+    if 'area' in var_lc:
+        a = pd.read_csv(f'{work_dir}/output/catchment_area.csv',index_col=0)
+        cc_lc.loc[j,'area'] = a.loc[j,'area']
+
+    if 'el_mean' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/elevation/stats_hydrosheds/ele_{j}.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'el_mean'] = e.loc[j,'mean_ele']
+        cc_lc.loc[j,'el_max'] = e.loc[j,'max_ele']
+        cc_lc.loc[j,'el_min'] = e.loc[j,'min_ele']
+        cc_lc.loc[j,'el_std'] = e.loc[j,'std_ele']
+    if 'slp_mean' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/elevation/stats_hydrosheds/slope_{j}.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'slp_mean'] = e.loc[j,'mean_slope']
+        cc_lc.loc[j,'slp_max'] = e.loc[j,'max_slope']
+        cc_lc.loc[j,'slp_min'] = e.loc[j,'min_slope']
+        cc_lc.loc[j,'slp_std'] = e.loc[j,'std_slope']
+
+    if 'iwu' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/irrigation/processed2/mean/{j}.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'iwu'] = e.loc[j,'iwu_mean_mmday']
+
+    if 'ia' in var_lc:
+        e = pd.read_csv(f'{work_dir}/data/irrigated_area/output/combined_ia.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'ia'] = e.loc[j,'hi']
+
+    if 'kg' in var_lc:
+        e = pd.read_csv(f'{work_dir}/data/koppen_climates/all_catch_table_kg_climates.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'kg'] = e.loc[j,'kg']
+
+    if 'lat' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/lat_lon_catchment_outlets.csv', index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,['lat','lon']] = e.loc[j,['lat','lon']]
+
+    if 'bp' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/bedrock_depth/0_01deg/{j}.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'bp'] = e.loc[j,'bd_perc']
+    if 'dtb' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/bedrock_depth/0_05deg/{j}.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'dtb'] = e.loc[j,'bd_mean']
+
+    if 'pclay' in var_lc:
+        e = pd.read_csv(f'{work_dir}/output/soil_types/processed/clay.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'pclay'] = e.loc[j,'mean']
+
+        e = pd.read_csv(f'{work_dir}/output/soil_types/processed/sand.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'psand'] = e.loc[j,'mean']
+
+        e = pd.read_csv(f'{work_dir}/output/soil_types/processed/carb.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'pcarb'] = e.loc[j,'mean']
+
+        e = pd.read_csv(f'{work_dir}/output/soil_types/processed/bulk.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'bulk'] = e.loc[j,'mean']
+
+        e = pd.read_csv(f'{work_dir}/output/soil_types/processed/text.csv',index_col=0)
+        e.index = e.index.map(str)
+        cc_lc.loc[j,'stext'] = e.loc[j,'med_text']
+    
+    return cc_lc
+
+
+def catch_characteristics_lc(var_lc,catch_id, work_dir,data_sources):
+    """
+    combine climate and snow variables in one dataframe
+    returns: catchment characteristics dataframe cc - saved as csv file
+    """
+    cc = catch_characteristics_landscape(var_lc, catch_id,work_dir)
+    cc.to_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/landscape/{catch_id}.csv') #store cc dataframe
+
+    
+def run_function_parallel_catch_characteristics_lc(
+    var_lc_list=list,
+    catch_list=list,
+    work_dir_list=list,
+    data_sources_list=list,
+    # threads=None
+    threads=100
+    ):
+    """
+    Runs function preprocess_gsim_discharge  in parallel.
+
+    var_cl_list: str,list, list of climate variables
+    var_sn_list: str,list, list of climate snow variables
+    catch_list:  str, list, list of catchmet ids
+    work_dir_list:     str, list, list of work dir
+    data_sources: combination of data used for P, Ep and T (gswp-p_gleam-ep_gswp-t for example)
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        catch_characteristics_lc,
+        var_lc_list,
+        catch_list,
+        work_dir_list,
+        data_sources_list,
+    )
+    
+
+# def catch_characteristics(var_lc,var_cl,var_sn, catch_id, work_dir,data_sources):
+#     """
+#     combine climate and landscape variables in one dataframe
+#     returns: catchment characteristics dataframe cc - saved as csv file
+#     """
+#     cc_lc = catch_characteristics_landscape(var_lc,catch_id,work_dir)
+#     cc_cl = catch_characteristics_climate(var_cl, catch_id,work_dir,data_sources)
+#     cc_sn = catch_characteristics_climate_snow(var_sn, catch_id,work_dir,data_sources)
+#     cc = pd.concat([cc_cl,cc_sn,cc_lc],axis=1)
+    
+#     # merge with existing dataframe
+#     if os.path.exists(f'{work_dir}/output/catchment_characteristics/{data_sources}/{catch_id}.csv'):
+#         cce = pd.read_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/{catch_id}.csv',index_col=0)
+#         cc2 = pd.concat([cc,cce],axis=1)
+#     else: 
+#         cc2 = cc
+#     cc2.to_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/{catch_id}.csv') #store cc dataframe
+    
+
+
     
 
     
