@@ -531,8 +531,7 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
     total_years = year_end - year_start
     years = range(year_start,year_end+1,1)
 
-    # calculate annual max Sd - without iterations for hydro years
-    # CHECK THIS PROCEDURE AGAIN FRANSJE
+    # calculate annual max-min Sd for hydro years
     Sd_max=[]
     Sd_maxmin = []
     if (str(date_start)=='1-1'):
@@ -565,8 +564,13 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
         start_rz_year=13
     day_end_rz_year = calendar.monthrange(2010,start_rz_year-1)[1] #find last day of end month rz year
     date_end_rz_year = str(start_rz_year-1)+'-'+str(day_end_rz_year)
+    
+    if ((start_rz_year) < (sd_table.index[0].month)):
+        year_start = year_start+1
+    total_years = year_end - year_start
+    years = range(year_start,year_end+1,1)
 
-    # calculate annual max Sd - without iterations for rootzone years -> CHECK THIS APPROACH
+    # calculate annual max Sd - without iterations for rootzone years 
     Sd_max_rz_year = []
     Sd_maxmin_rz_year = []
     if (str(date_start_rz_year)=='1-1'):
