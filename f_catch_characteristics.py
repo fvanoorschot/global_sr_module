@@ -303,7 +303,7 @@ def hpf(df):
 
 def lpf(df):
     """
-    low precipitation frequency: days with p<1mm / total days
+    low precipitation frequency: days with p<1mm
     df: pandas dataframe, P and Ep timeseries
     returns: lpf [-]
     """
