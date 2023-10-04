@@ -141,6 +141,34 @@ def si_ep(df):
         siep=np.nan
     return siep
 
+def ppd(df):
+    '''
+    potential precipitation deficit
+    monthly mean p and ep
+    for months with ep>p: sum values (use longest consecutive time period only)
+    return: sum
+    '''
+    df_m = df.loc[start_date:end_date].groupby(pd.Grouper(freq="M")).sum()
+    df_mm = df_m.groupby([df_m.index.month]).mean()
+
+    df_mm[df_mm.ep<df_mm.p] = np.nan
+    a = df_mm.p.values  # Extract out relevant column from dataframe as array
+    if (len(df_mm.dropna())==0):
+        difsum=0
+    else:
+        m = np.concatenate(( [True], np.isnan(a), [True] ))  # Mask
+        ss = np.flatnonzero(m[1:] != m[:-1]).reshape(-1,2)   # Start-stop limits
+        start,stop = ss[(ss[:,1] - ss[:,0]).argmax()]  # Get max interval, interval limits
+        if (start==0)&(pd.isna(df_mm.p.iloc[-1])==False):
+            df_mm2 = df_mm
+            dif = df_mm2.p - df_mm2.ep
+            difsum = dif.sum()
+        else:
+            df_mm2 = df_mm.iloc[start:stop]
+            dif = df_mm2.p - df_mm2.ep
+            difsum = dif.sum()
+    return abs(difsum)
+
 def phi(df):
     """
     calculate phase lag (timing shift) between max Ep and max P 
@@ -625,6 +653,8 @@ def catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
         
     if 'cvp' in var_cl:
         cc_cl.loc[j,'cvp'] = cvp(df)
+    if 'ppd' in var_cl:
+        cc_cl.loc[j,'ppd'] = ppd(df)
     
     # SNOW
     snow_list=np.genfromtxt(f'{work_dir}/output/snow/catch_id_list_snow_t_and_p_italy.txt',dtype='str')
@@ -668,6 +698,9 @@ def catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
                 
             if 'asi_l' in var_sn:
                 cc_sn.loc[j,'asi_l'] = asi(df)
+            
+            if 'ppd_l' in var_cl:
+                cc_sn.loc[j,'ppd'] = ppd(df)
 
         else: # if no snow, then liquid p variables same as normal p variables
             l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
