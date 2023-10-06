@@ -148,6 +148,16 @@ def ppd(df):
     for months with ep>p: sum values (use longest consecutive time period only)
     return: sum
     '''
+    p = df['p']
+    ep = df['ep']
+    for j in p.index:
+        if(j.month==1 and j.day==1):
+            start_date = j
+            break
+    for j in p.index:
+        if(j.month==12 and j.day==31):
+            end_date = j
+            
     df_m = df.loc[start_date:end_date].groupby(pd.Grouper(freq="M")).sum()
     df_mm = df_m.groupby([df_m.index.month]).mean()
 
