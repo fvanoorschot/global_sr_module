@@ -565,7 +565,7 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
     day_end_rz_year = calendar.monthrange(2010,start_rz_year-1)[1] #find last day of end month rz year
     date_end_rz_year = str(start_rz_year-1)+'-'+str(day_end_rz_year)
     
-    if ((start_rz_year) < (sd_table.index[0].month)):
+    if ((start_rz_year) < (Sd.index[0].month)):
         year_start = year_start+1
     total_years = year_end - year_start
     years = range(year_start,year_end+1,1)
@@ -594,33 +594,8 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
             min_value = min(sd_hystart_maxvalue) #find min value in timeseries before max value
             Sd_maxmin_rz_year.append(sd_max_i-min_value) #append max-min sd per year        
 
-    return(Sd_maxmin)
+    return(Sd_maxmin_rz_year)
 
-#     # gumbel function
-#     def gumbel_r_mom(x):
-#         """
-#         gumbel extreme value analysis
-#         x:        list of max sd values per year
-#         returns:  loc and scale of gumbel distribution
-        
-#         """
-#         scale = np.sqrt(6)/np.pi * np.std(x)
-#         loc = np.mean(x) - np.euler_gamma*scale
-#         return loc, scale    
-
-#     # calculate gumbel parameters
-#     # loc1, scale1 = gumbel_r_mom(Sd_maxmin_rz_year)
-#     loc1, scale1 = gumbel_r_mom(Sd_maxmin)
-
-#     # find Sd value corresponding with return period
-#     Sd_T = []
-#     for i in np.arange(0,len(rp_array),1):
-#         p = 1-(1/rp_array[i])
-#         y = -np.log(-np.log(p))
-#         x = scale1 * y + loc1
-#         Sd_T.append(x)
-         
-#     return(Sd_T)   
 
 
 def gumbel(Sd_maxmin):
@@ -641,12 +616,8 @@ def gumbel(Sd_maxmin):
     sigma = s_R / s_y
     mu = R_max_gem - s_R * (y_gem / s_y)
 
-    # Now we can construct the Gumbel fit and plot the Gumbel line
-    dummy_y = np.arange(-2,6.01,0.2)
-    R_Gumbel = sigma * dummy_y + mu
-
     # Here we define the return periods and we inspect the difference between the two return periods
-    T_interest = np.asarray([1,2,3,5,10,20,30,40,50,60,70,80])
+    T_interest = np.asarray([1.5,2,3,5,10,20,30,40,50,60,70,80])
     T_a_interest = 1 / (1-np.exp(-1/T_interest))
 
     # real return period for the observed annual maxima
@@ -656,7 +627,7 @@ def gumbel(Sd_maxmin):
     df.loc[:,'T'] = T
 
     # exercise, Gumbel estimate for return period array T_interest
-    gumbel_estimate = sigma * (-np.log(1/T_interest)) + mu
+    gumbel_estimate = sigma * (-np.log(-np.log(1-(1/T_interest)))) + mu
     
     return(df,T_interest,gumbel_estimate)
 
@@ -701,14 +672,14 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,ir_case):
 
                 # get observed extremes as points
                 df = gumbel(sd_maxmin)[0]
-                df.to_csv(f'{sd_dir}/no_irri/sr/{catch_id}_points.csv')
+                df.to_csv(f'{sd_dir}/no_irri/sr_rzyear/{catch_id}_points.csv')
 
                 # get gumbel fit for different T
                 T_interest = gumbel(sd_maxmin)[1]
                 gumbel_estimate = gumbel(sd_maxmin)[2]
                 sr_df = pd.DataFrame(index=[catch_id], columns=T_interest)
                 sr_df.loc[catch_id]=gumbel_estimate
-                sr_df.to_csv(f'{sd_dir}/no_irri/sr/{catch_id}_gumbelfit.csv')
+                sr_df.to_csv(f'{sd_dir}/no_irri/sr_rzyear/{catch_id}_gumbelfit.csv')
                 return(sr_df)
     
     else:
@@ -742,14 +713,14 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,ir_case):
 
                 # get oberved extremes as points
                 df = gumbel(sd_maxmin)[0]
-                df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}_points.csv')
+                df.to_csv(f'{sd_dir}/irri/f{f}/sr_rzyear/{catch_id}_f{f}_points.csv')
 
                 # get gumbel fit for different T
                 T_interest = gumbel(sd_maxmin)[1]
                 gumbel_estimate = gumbel(sd_maxmin)[2]
                 sr_df = pd.DataFrame(index=[catch_id], columns=T_interest)
                 sr_df.loc[catch_id]=gumbel_estimate
-                sr_df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}_gumbelfit.csv')
+                sr_df.to_csv(f'{sd_dir}/irri/f{f}/sr_rzyear/{catch_id}_f{f}_gumbelfit.csv')
 
                 return(sr_df)
 
