@@ -175,8 +175,8 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir,w
         # get P Ep and Q files for catch id
         f_pep = glob.glob(f'{pep_dir}/{catch_id}*.csv')
         
-    cc = pd.read_csv(f'{work_dir}/output/catchment_characteristics/gswp-p_gleam-ep_gswp-t/{catch_id}.csv',index_col=0)
-    ir_area = cc.ir_mean.values
+    cc = pd.read_csv(f'{work_dir}/output/catchment_characteristics/gswp-p_gleam-ep_gswp-t/landscape/{catch_id}.csv',index_col=0)
+    ir_area = cc.ia.values
 
     # read q df
     f_q = glob.glob(f'{q_dir}/{catch_id}*.csv')
@@ -594,7 +594,8 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
             min_value = min(sd_hystart_maxvalue) #find min value in timeseries before max value
             Sd_maxmin_rz_year.append(sd_max_i-min_value) #append max-min sd per year        
 
-    return(Sd_maxmin_rz_year)
+    # return(Sd_maxmin_rz_year)
+    return(Sd_maxmin)
 
 
 
@@ -672,14 +673,14 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,ir_case):
 
                 # get observed extremes as points
                 df = gumbel(sd_maxmin)[0]
-                df.to_csv(f'{sd_dir}/no_irri/sr_rzyear/{catch_id}_points.csv')
+                df.to_csv(f'{sd_dir}/no_irri/sr/{catch_id}_points.csv')
 
                 # get gumbel fit for different T
                 T_interest = gumbel(sd_maxmin)[1]
                 gumbel_estimate = gumbel(sd_maxmin)[2]
                 sr_df = pd.DataFrame(index=[catch_id], columns=T_interest)
                 sr_df.loc[catch_id]=gumbel_estimate
-                sr_df.to_csv(f'{sd_dir}/no_irri/sr_rzyear/{catch_id}_gumbelfit.csv')
+                sr_df.to_csv(f'{sd_dir}/no_irri/sr/{catch_id}_gumbelfit.csv')
                 return(sr_df)
     
     else:
@@ -713,14 +714,14 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,ir_case):
 
                 # get oberved extremes as points
                 df = gumbel(sd_maxmin)[0]
-                df.to_csv(f'{sd_dir}/irri/f{f}/sr_rzyear/{catch_id}_f{f}_points.csv')
+                df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}_points.csv')
 
                 # get gumbel fit for different T
                 T_interest = gumbel(sd_maxmin)[1]
                 gumbel_estimate = gumbel(sd_maxmin)[2]
                 sr_df = pd.DataFrame(index=[catch_id], columns=T_interest)
                 sr_df.loc[catch_id]=gumbel_estimate
-                sr_df.to_csv(f'{sd_dir}/irri/f{f}/sr_rzyear/{catch_id}_f{f}_gumbelfit.csv')
+                sr_df.to_csv(f'{sd_dir}/irri/f{f}/sr/{catch_id}_f{f}_gumbelfit.csv')
 
                 return(sr_df)
 

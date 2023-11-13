@@ -709,8 +709,8 @@ def catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
             if 'asi_l' in var_sn:
                 cc_sn.loc[j,'asi_l'] = asi(df)
             
-            if 'ppd_l' in var_cl:
-                cc_sn.loc[j,'ppd'] = ppd(df)
+            if 'ppd_l' in var_sn:
+                cc_sn.loc[j,'ppd_l'] = ppd(df)
 
         else: # if no snow, then liquid p variables same as normal p variables
             l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
@@ -745,6 +745,9 @@ def catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
             
             if 'asi_l' in var_sn:
                 cc_sn.loc[j,'asi_l'] = asi(df)
+            
+            if 'ppd_l' in var_sn:
+                cc_sn.loc[j,'ppd_l'] = ppd(df)
         
         cc = pd.concat([cc_cl,cc_sn],axis=1)
         
