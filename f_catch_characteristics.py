@@ -885,7 +885,39 @@ def catch_characteristics_landscape(var_lc,catch_id,work_dir):
         e = pd.read_csv(f'{work_dir}/output/soil_types/processed/text.csv',index_col=0)
         e.index = e.index.map(str)
         cc_lc.loc[j,'stext'] = e.loc[j,'med_text']
-    
+        
+    if 'fc_mean' in var_lc:
+        if os.path.exists(f'{work_dir}/output/lai_fcover/lai_timeseries/{j}_lai_mean_2010_2010.csv'):
+            e = pd.read_csv(f'{work_dir}/output/lai_fcover/lai_timeseries/{j}_lai_mean_2010_2010.csv',index_col=0)
+            cc_lc.loc[j,'lai_mean'] = e.leaf_area_index.mean()
+            if (e.leaf_area_index.mean()>0):
+                cc_lc.loc[j,'lai_rsd'] = e.leaf_area_index.std()/e.leaf_area_index.mean()
+            else:
+                cc_lc.loc[j,'lai_rsd'] = 0
+
+            e = pd.read_csv(f'{work_dir}/output/lai_fcover/fcover_timeseries/{j}_fcover_mean_2010_2010.csv',index_col=0)
+            cc_lc.loc[j,'fc_mean'] = e.vegetation_area_fraction.mean()
+            if (e.vegetation_area_fraction.mean()>0):
+                cc_lc.loc[j,'fc_rsd'] = e.vegetation_area_fraction.std()/e.vegetation_area_fraction.mean()
+            else:
+                cc_lc.loc[j,'fc_rsd'] = 0  
+        else:
+            cc_lc.loc[j,'lai_mean'] = np.nan
+            cc_lc.loc[j,'lai_rsd'] = np.nan
+            cc_lc.loc[j,'fc_mean'] = np.nan
+            cc_lc.loc[j,'fc_rsd'] = np.nan
+        
+        if os.path.exists(f'{work_dir}/output/snow_cover/timeseries/{j}_snowcover_mean_2010_2010.csv'):
+            e = pd.read_csv(f'{work_dir}/output/snow_cover/timeseries/{j}_snowcover_mean_2010_2010.csv',index_col=0)
+            cc_lc.loc[j,'sc_mean'] = e['Monthly snow cover extent, 5km'].mean()
+      
+            if (e['Monthly snow cover extent, 5km'].mean()>0):
+                cc_lc.loc[j,'sc_rsd'] = e['Monthly snow cover extent, 5km'].std()/e['Monthly snow cover extent, 5km'].mean()
+            else:
+                cc_lc.loc[j,'sc_rsd'] = 0
+        else:
+            cc_lc.loc[j,'sc_mean'] = np.nan
+            cc_lc.loc[j,'sc_rsd'] = np.nan   
     return cc_lc
 
 
