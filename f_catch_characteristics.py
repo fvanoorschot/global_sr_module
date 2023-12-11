@@ -566,6 +566,35 @@ def cvp(df):
     cvp_var = ps/pa
     return cvp_var
 
+def phi_sc(df,j):
+    if os.path.exists(f'/mnt/u/LSM root zone/global_sr/output/snow_cover/timeseries/{j}_snowcover_mean_2010_2010.csv'):
+        e = pd.read_csv(f'/mnt/u/LSM root zone/global_sr/output/snow_cover/timeseries/{j}_snowcover_mean_2010_2010.csv',index_col=0)
+        em = e['Monthly snow cover extent, 5km'].mean()
+        es = e['Monthly snow cover extent, 5km']
+        if (em>0):
+            sc_min_month = es.idxmin()
+            ep = df['ep']
+            for j in ep.index:
+                if(j.month==1 and j.day==1):
+                    start_date = j
+                break
+            for k in ep.index:
+                if(k.month==12 and k.day==31):
+                    end_date = k
+
+            ep_monthly = ep.loc[start_date:end_date].groupby(pd.Grouper(freq="M")).sum()
+            epm = ep_monthly.groupby([ep_monthly.index.month]).mean()
+            epm_max_month = epm.idxmax()
+            phi = np.abs(epm_max_month - sc_min_month)
+
+            if(phi>6):
+                phi = 12 + min(epm_max_month,sc_min_month) - max(epm_max_month,sc_min_month)
+        else:
+            phi=0
+    else:
+        phi=0
+    return phi
+
 # combine climate catch characteristics
 def catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources):
     cc_cl = pd.DataFrame(index=[catch_id], columns=var_cl)
@@ -665,6 +694,8 @@ def catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
         cc_cl.loc[j,'cvp'] = cvp(df)
     if 'ppd' in var_cl:
         cc_cl.loc[j,'ppd'] = ppd(df)
+    if 'phi_sc' in var_cl:
+        cc_cl.loc[j,'phi_sc'] = phi_sc(df,j)
     
     # SNOW
     snow_list=np.genfromtxt(f'{work_dir}/output/snow/catch_id_list_snow_t_and_p_italy.txt',dtype='str')
