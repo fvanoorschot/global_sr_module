@@ -600,9 +600,20 @@ def catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
     cc_cl = pd.DataFrame(index=[catch_id], columns=var_cl)
     j = catch_id
     if (data_sources=='gswp-p_gleam-ep_gswp-t'):
-        l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
-        df = pd.read_csv(l[0], index_col=0)
-        df.index = pd.to_datetime(df.index)
+        if(os.path.exists(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}_1981_2010.csv')==True):
+            l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
+            df = pd.read_csv(l[0], index_col=0)
+            df.index = pd.to_datetime(df.index)
+        else:
+            return cc_cl
+        
+    if (data_sources=='mswep-p_gleam-ep_gswp-t'):
+        if(os.path.exists(f'{work_dir}/output/forcing_timeseries/processed_mswep_gleam_gswp/daily/{j}_1981_2010.csv')==True):
+            l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed_mswep_gleam_gswp/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
+            df = pd.read_csv(l[0], index_col=0)
+            df.index = pd.to_datetime(df.index)
+        else:
+            return cc_cl
 
     l_q = glob.glob(f'{work_dir}/output/q_timeseries_selected/{j}*.csv') # find discharge data for catchment
     df_q = pd.read_csv(l_q[0], index_col=0)
@@ -698,91 +709,97 @@ def catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
         cc_cl.loc[j,'phi_sc'] = phi_sc(df,j)
     
     # SNOW
-    snow_list=np.genfromtxt(f'{work_dir}/output/snow/catch_id_list_snow_t_and_p_italy.txt',dtype='str')
     cc_sn = pd.DataFrame(index=[catch_id], columns=var_sn)
     j = catch_id
     if (data_sources=='gswp-p_gleam-ep_gswp-t'):
         pdata='gswp'
-        if j in snow_list: # if snow, use liquid input instead of p
-            l = glob.glob(f'{work_dir}/output/snow/timeseries_{pdata}/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment liquid input
-            df = pd.read_csv(l[0], index_col=0)
-            df.index = pd.to_datetime(df.index)
-            df = df.loc[start_date:end_date]
+        snow_list=np.genfromtxt(f'{work_dir}/output/snow/catch_id_list_snow_t_and_p_italy.txt',dtype='str')
+    if (data_sources=='mswep-p_gleam-ep_gswp-t'):
+        pdata='mswep'
+        snow_list=np.genfromtxt(f'{work_dir}/output/snow/catch_id_list_snow_t_and_p_mswep.txt',dtype='str')
+    if j in snow_list: # if snow, use liquid input instead of p
+        l = glob.glob(f'{work_dir}/output/snow/timeseries_{pdata}/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment liquid input
+        df = pd.read_csv(l[0], index_col=0)
+        df.index = pd.to_datetime(df.index)
+        df = df.loc[start_date:end_date]
 
-            # set df p column to df pl 
-            df['p']=df['pl']
+        # set df p column to df pl 
+        df['p']=df['pl']
 
-            # calculate catchment characteristics using functions in (1)
-            if 'si_pl' in var_sn:
-                cc_sn.loc[j,'si_pl'] = si_p(df) 
+        # calculate catchment characteristics using functions in (1)
+        if 'si_pl' in var_sn:
+            cc_sn.loc[j,'si_pl'] = si_p(df) 
 
-            if 'phi_l' in var_sn:
-                cc_sn.loc[j,'phi_l'] = phi(df)
+        if 'phi_l' in var_sn:
+            cc_sn.loc[j,'phi_l'] = phi(df)
 
-            if 'idu_mean_l' in var_sn:
-                cc_sn.loc[j,'idu_mean_l'] = idu_mean(df)
-            if 'idu_max_l' in var_sn:
-                cc_sn.loc[j,'idu_max_l'] = idu_max(df)
+        if 'idu_mean_l' in var_sn:
+            cc_sn.loc[j,'idu_mean_l'] = idu_mean(df)
+        if 'idu_max_l' in var_sn:
+            cc_sn.loc[j,'idu_max_l'] = idu_max(df)
 
-            if 'hpd_mean_l' in var_sn:
-                cc_sn.loc[j,'hpd_mean_l'] = hpd_mean(df)
-            if 'hpd_max_l' in var_sn:
-                cc_sn.loc[j,'hpd_max_l'] = hpd_max(df)
+        if 'hpd_mean_l' in var_sn:
+            cc_sn.loc[j,'hpd_mean_l'] = hpd_mean(df)
+        if 'hpd_max_l' in var_sn:
+            cc_sn.loc[j,'hpd_max_l'] = hpd_max(df)
 
-            if 'hpf_l' in var_sn:
-                cc_sn.loc[j,'hpf_l'] = hpf(df)
-            if 'lpf_l' in var_sn:
-                cc_sn.loc[j,'lpf_l'] = lpf(df)
+        if 'hpf_l' in var_sn:
+            cc_sn.loc[j,'hpf_l'] = hpf(df)
+        if 'lpf_l' in var_sn:
+            cc_sn.loc[j,'lpf_l'] = lpf(df)
 
-            if 'sti_l' in var_sn:
-                cc_sn.loc[j,['de_l','dp_l','dt_l','sp_l','st_l','se_l','sd_l','sti_l']] = seas_var_indices(df)
-                
-            if 'asi_l' in var_sn:
-                cc_sn.loc[j,'asi_l'] = asi(df)
-            
-            if 'ppd_l' in var_sn:
-                cc_sn.loc[j,'ppd_l'] = ppd(df)
+        if 'sti_l' in var_sn:
+            cc_sn.loc[j,['de_l','dp_l','dt_l','sp_l','st_l','se_l','sd_l','sti_l']] = seas_var_indices(df)
 
-        else: # if no snow, then liquid p variables same as normal p variables
+        if 'asi_l' in var_sn:
+            cc_sn.loc[j,'asi_l'] = asi(df)
+
+        if 'ppd_l' in var_sn:
+            cc_sn.loc[j,'ppd_l'] = ppd(df)
+
+    else: # if no snow, then liquid p variables same as normal p variables
+        if(pdata=='gswp'):
             l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
-            df = pd.read_csv(l[0], index_col=0)
-            df.index = pd.to_datetime(df.index)
-            df = df.loc[start_date:end_date]
+        if(pdata=='mswep'):
+            l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed_mswep_gleam_gswp/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
+        df = pd.read_csv(l[0], index_col=0)
+        df.index = pd.to_datetime(df.index)
+        df = df.loc[start_date:end_date]
 
-            # calculate catchment characteristics using functions in (1)
-            if 'si_pl' in var_sn:
-                cc_sn.loc[j,'si_pl'] = si_p(df) 
+        # calculate catchment characteristics using functions in (1)
+        if 'si_pl' in var_sn:
+            cc_sn.loc[j,'si_pl'] = si_p(df) 
 
-            if 'phi_l' in var_sn:
-                cc_sn.loc[j,'phi_l'] = phi(df)
+        if 'phi_l' in var_sn:
+            cc_sn.loc[j,'phi_l'] = phi(df)
 
-            if 'idu_mean_l' in var_sn:
-                cc_sn.loc[j,'idu_mean_l'] = idu_mean(df)
-            if 'idu_max_l' in var_sn:
-                cc_sn.loc[j,'idu_max_l'] = idu_max(df)
+        if 'idu_mean_l' in var_sn:
+            cc_sn.loc[j,'idu_mean_l'] = idu_mean(df)
+        if 'idu_max_l' in var_sn:
+            cc_sn.loc[j,'idu_max_l'] = idu_max(df)
 
-            if 'hpd_mean_l' in var_sn:
-                cc_sn.loc[j,'hpd_mean_l'] = hpd_mean(df)
-            if 'hpd_max_l' in var_sn:
-                cc_sn.loc[j,'hpd_max_l'] = hpd_max(df)
+        if 'hpd_mean_l' in var_sn:
+            cc_sn.loc[j,'hpd_mean_l'] = hpd_mean(df)
+        if 'hpd_max_l' in var_sn:
+            cc_sn.loc[j,'hpd_max_l'] = hpd_max(df)
 
-            if 'hpf_l' in var_sn:
-                cc_sn.loc[j,'hpf_l'] = hpf(df)
-            if 'lpf_l' in var_sn:
-                cc_sn.loc[j,'lpf_l'] = lpf(df)
+        if 'hpf_l' in var_sn:
+            cc_sn.loc[j,'hpf_l'] = hpf(df)
+        if 'lpf_l' in var_sn:
+            cc_sn.loc[j,'lpf_l'] = lpf(df)
 
-            if 'sti_l' in var_sn:
-                cc_sn.loc[j,['de_l','dp_l','dt_l','sp_l','st_l','se_l','sd_l','sti_l']] = seas_var_indices(df)
-            
-            if 'asi_l' in var_sn:
-                cc_sn.loc[j,'asi_l'] = asi(df)
-            
-            if 'ppd_l' in var_sn:
-                cc_sn.loc[j,'ppd_l'] = ppd(df)
+        if 'sti_l' in var_sn:
+            cc_sn.loc[j,['de_l','dp_l','dt_l','sp_l','st_l','se_l','sd_l','sti_l']] = seas_var_indices(df)
+
+        if 'asi_l' in var_sn:
+            cc_sn.loc[j,'asi_l'] = asi(df)
+
+        if 'ppd_l' in var_sn:
+            cc_sn.loc[j,'ppd_l'] = ppd(df)
+
+    cc = pd.concat([cc_cl,cc_sn],axis=1)
         
-        cc = pd.concat([cc_cl,cc_sn],axis=1)
-        
-        return cc
+    return cc
 
 
 def catch_characteristics(var_cl,var_sn, catch_id, work_dir,data_sources):
@@ -792,6 +809,14 @@ def catch_characteristics(var_cl,var_sn, catch_id, work_dir,data_sources):
     """
     cc = catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
     cc.to_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/climate/{catch_id}.csv') #store cc dataframe
+
+def catch_characteristics_1(var_cl,var_sn, catch_id, work_dir,data_sources):
+    """
+    combine climate and snow variables in one dataframe
+    returns: catchment characteristics dataframe cc - saved as csv file
+    """
+    cc = catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
+    cc.to_csv(f'{work_dir}/output/catchment_characteristics/{data_sources}/climate_wb/{catch_id}.csv') #store cc dataframe
 
     
 def run_function_parallel_catch_characteristics(
@@ -830,7 +855,42 @@ def run_function_parallel_catch_characteristics(
         data_sources_list,
     )
     
-    
+def run_function_parallel_catch_characteristics_1(
+    var_cl_list=list,
+    var_sn_list=list,
+    catch_list=list,
+    work_dir_list=list,
+    data_sources_list=list,
+    # threads=None
+    threads=100
+    ):
+    """
+    Runs function preprocess_gsim_discharge  in parallel.
+
+    var_cl_list: str,list, list of climate variables
+    var_sn_list: str,list, list of climate snow variables
+    catch_list:  str, list, list of catchmet ids
+    work_dir_list:     str, list, list of work dir
+    data_sources: combination of data used for P, Ep and T (gswp-p_gleam-ep_gswp-t for example)
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        catch_characteristics_1,
+        var_cl_list,
+        var_sn_list,
+        catch_list,
+        work_dir_list,
+        data_sources_list,
+    )
+        
     
 def catch_characteristics_landscape(var_lc,catch_id,work_dir):
     """
