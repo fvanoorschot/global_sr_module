@@ -614,6 +614,22 @@ def catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
             df.index = pd.to_datetime(df.index)
         else:
             return cc_cl
+        
+    if (data_sources=='mswep-p_hs-ep_gswp-t'):
+        if(os.path.exists(f'{work_dir}/output/forcing_timeseries/processed_mswep_hs_gswp/daily/{j}_1981_2010.csv')==True):
+            l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed_mswep_hs_gswp/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
+            df = pd.read_csv(l[0], index_col=0)
+            df.index = pd.to_datetime(df.index)
+        else:
+            return cc_cl
+        
+    if (data_sources=='gswp-p_hs-ep_gswp-t'):
+        if(os.path.exists(f'{work_dir}/output/forcing_timeseries/processed_gswp_hs_gswp/daily/{j}_1981_2010.csv')==True):
+            l = glob.glob(f'{work_dir}/output/forcing_timeseries/processed_gswp_hs_gswp/daily/{j}*.csv') #find daily forcing (P Ep T) timeseries for catchment 
+            df = pd.read_csv(l[0], index_col=0)
+            df.index = pd.to_datetime(df.index)
+        else:
+            return cc_cl
 
     l_q = glob.glob(f'{work_dir}/output/q_timeseries_selected/{j}*.csv') # find discharge data for catchment
     df_q = pd.read_csv(l_q[0], index_col=0)
@@ -711,10 +727,10 @@ def catch_characteristics_climate(var_cl,var_sn, catch_id,work_dir,data_sources)
     # SNOW
     cc_sn = pd.DataFrame(index=[catch_id], columns=var_sn)
     j = catch_id
-    if (data_sources=='gswp-p_gleam-ep_gswp-t'):
+    if ((data_sources=='gswp-p_gleam-ep_gswp-t') or (data_sources=='gswp-p_hs-ep_gswp-t')):
         pdata='gswp'
         snow_list=np.genfromtxt(f'{work_dir}/output/snow/catch_id_list_snow_t_and_p_italy.txt',dtype='str')
-    if (data_sources=='mswep-p_gleam-ep_gswp-t'):
+    if ((data_sources=='mswep-p_gleam-ep_gswp-t') or (data_sources=='mswep-p_hs-ep_gswp-t')):
         pdata='mswep'
         snow_list=np.genfromtxt(f'{work_dir}/output/snow/catch_id_list_snow_t_and_p_mswep.txt',dtype='str')
     if j in snow_list: # if snow, use liquid input instead of p
