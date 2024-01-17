@@ -596,8 +596,8 @@ def sr_return_periods_minmax_rzyear(rp_array,Sd,year_start,year_end,date_start,d
             min_value = min(sd_hystart_maxvalue) #find min value in timeseries before max value
             Sd_maxmin_rz_year.append(sd_max_i-min_value) #append max-min sd per year        
 
-    # return(Sd_maxmin_rz_year)
-    return(Sd_maxmin)
+    return(Sd_maxmin_rz_year)
+    # return(Sd_maxmin)
 
 
 
@@ -727,7 +727,54 @@ def run_sr_calculation(catch_id, rp_array, sd_dir, out_dir,ir_case):
 
                 return(sr_df)
 
+            
+## 6
+def run_sr_calculation2(catch_id, rp_array, sd_dir, out_dir):
+    """
+    run sr calculation
     
+    catch_id:   str, catchment id
+    rp_array:   int, array, array of return periods
+    sd_dir:     str, dir, directory with sd dataframes
+    out_dir:    str, dir, output directory   
+    returns:    sr_df, dataframe with sr for catchment, stored as csv
+    
+    """
+    if(os.path.exists(f'{sd_dir}/sd/{catch_id}.csv')==True):  
+
+        # read storage deficit table
+        sd_table = pd.read_csv(f'{sd_dir}/sd/{catch_id}.csv',index_col=0)
+        sd_table.index = pd.to_datetime(sd_table.index)
+
+        # get sd, start and end year and date from sd_table
+        if 'sd2' in sd_table.columns:
+            Sd = sd_table.sd2
+        else:
+            Sd = sd_table.Sd
+
+        year_start = sd_table.index[0].year
+        year_end = sd_table.index[-1].year
+        date_start = str(sd_table.index[0].month)+'-'+str(sd_table.index[0].day)
+        date_end = str(sd_table.index[-1].month)+'-'+str(sd_table.index[-1].day)
+        if(date_end=='2-29'):
+            date_end='2-28'
+
+        if ((year_end-year_start)>10) and (sd_table.Et.max()>0):#only if our timeseries is longer than 10years and Et is not nan
+            # calculate sr for different return periods using (4)
+            sd_maxmin = sr_return_periods_minmax_rzyear(rp_array, Sd, year_start, year_end, date_start, date_end)
+
+            # get observed extremes as points
+            df = gumbel(sd_maxmin)[0]
+            df.to_csv(f'{sd_dir}/sr/{catch_id}_points.csv')
+
+            # get gumbel fit for different T
+            T_interest = gumbel(sd_maxmin)[1]
+            gumbel_estimate = gumbel(sd_maxmin)[2]
+            sr_df = pd.DataFrame(index=[catch_id], columns=T_interest)
+            sr_df.loc[catch_id]=gumbel_estimate
+            sr_df.to_csv(f'{sd_dir}/sr/{catch_id}_gumbelfit.csv')
+            return(sr_df)
+        
 def run_sr_calculation_parallel(
     catch_id_list=list,
     rp_array_list=list,
@@ -761,6 +808,39 @@ def run_sr_calculation_parallel(
         sd_dir_list,
         out_dir_list,
         ir_case_list,
+    )
+    
+def run_sr_calculation_parallel2(
+    catch_id_list=list,
+    rp_array_list=list,
+    sd_dir_list=list,
+    out_dir_list=list,
+    # threads=None
+    threads=100
+):
+    """
+    Runs function area_weighted_shapefile_rasterstats in parallel.
+
+    catch_list:  str, list, list of catchment ids
+    rp_array_list:     str, list, list of return periods
+    sd_dir_list:   str, list, list of folder with sd
+    output_dir_list: str, list, list of output directories
+    threads:         int,       number of threads (cores), when set to None use all available threads
+
+    Returns: None
+    """
+    # Set number of threads (cores) used for parallel run and map threads
+    if threads is None:
+        pool = Pool()
+    else:
+        pool = Pool(nodes=threads)
+    # Run parallel models
+    results = pool.map(
+        run_sr_calculation2,
+        catch_id_list,
+        rp_array_list,
+        sd_dir_list,
+        out_dir_list,
     )
 
 ## 7
