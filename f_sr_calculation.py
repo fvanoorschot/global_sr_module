@@ -265,15 +265,15 @@ def run_sd_calculation(catch_id, pep_dir, q_dir, out_dir,snow_id_list,snow_dir,w
                     f = ir[2]
                     if (ir_case=='iaf'):
                         # se_out.to_csv(f'{out_dir}/irri/f0.9ia/se/{catch_id}_f0.9ia.csv')
-                        # out.to_csv(f'{out_dir}/irri/f0.9ia/sd/{catch_id}_f0.9ia.csv')
-                        out.to_csv(f'{out_dir}/sd/{catch_id}.csv')
+                        out.to_csv(f'{out_dir}/irri/f0.9ia/sd/{catch_id}_f0.9ia.csv')
+                        # out.to_csv(f'{out_dir}/sd/{catch_id}.csv')
                     if (ir_case=='iwu'):
                         # se_out.to_csv(f'{out_dir}/irri/fiwu2/se/{catch_id}_fiwu2.csv')
                         out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
                 else: 
                     if (ir_case=='iaf'):
-                        # out.to_csv(f'{out_dir}/irri/f0.9ia/sd/{catch_id}_f0.9ia.csv')
-                        out.to_csv(f'{out_dir}/sd/{catch_id}.csv')
+                        out.to_csv(f'{out_dir}/irri/f0.9ia/sd/{catch_id}_f0.9ia.csv')
+                        # out.to_csv(f'{out_dir}/sd/{catch_id}.csv')
                     if (ir_case=='iwu'):
                         out.to_csv(f'{out_dir}/irri/fiwu2/sd/{catch_id}_fiwu2.csv')
 
