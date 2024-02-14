@@ -925,7 +925,7 @@ def catch_characteristics_landscape(var_lc,catch_id,work_dir):
         cc_lc.loc[j,'nonveg'] = dft.loc[j,'mean_nonveg']/100
 
     if 'area' in var_lc:
-        a = pd.read_csv(f'{work_dir}/output/catchment_area.csv',index_col=0)
+        a = pd.read_csv(f'{work_dir}/output/catchment_area2.csv',index_col=0)
         cc_lc.loc[j,'area'] = a.loc[j,'area']
 
     if 'el_mean' in var_lc:
@@ -985,13 +985,13 @@ def catch_characteristics_landscape(var_lc,catch_id,work_dir):
         e.index = e.index.map(str)
         cc_lc.loc[j,'pcarb'] = e.loc[j,'mean']
 
-        e = pd.read_csv(f'{work_dir}/output/soil_types/processed/bulk.csv',index_col=0)
-        e.index = e.index.map(str)
-        cc_lc.loc[j,'bulk'] = e.loc[j,'mean']
+#         e = pd.read_csv(f'{work_dir}/output/soil_types/processed/bulk.csv',index_col=0)
+#         e.index = e.index.map(str)
+#         cc_lc.loc[j,'bulk'] = e.loc[j,'mean']
 
-        e = pd.read_csv(f'{work_dir}/output/soil_types/processed/text.csv',index_col=0)
-        e.index = e.index.map(str)
-        cc_lc.loc[j,'stext'] = e.loc[j,'med_text']
+#         e = pd.read_csv(f'{work_dir}/output/soil_types/processed/text.csv',index_col=0)
+#         e.index = e.index.map(str)
+#         cc_lc.loc[j,'stext'] = e.loc[j,'med_text']
         
     if 'fc_mean' in var_lc:
         if os.path.exists(f'{work_dir}/output/lai_fcover/lai_timeseries/{j}_lai_mean_2010_2010.csv'):
