@@ -24,6 +24,7 @@ from scipy.io import loadmat  # this is the SciPy module that loads mat-files
 import random
 import sklearn
 import xarray as xr
+import scipy.stats
 from sklearn.linear_model import LinearRegression
 from sklearn.feature_selection import SequentialFeatureSelector
 from scipy.stats import gaussian_kde
@@ -571,15 +572,24 @@ def compute_corr_tables_weighted():
         return weighted_corr
 
     def weighted_spearmanr(x, y, weights):
-        # Calculate the ranks of x and y
-        ranks_x = np.argsort(x)
-        ranks_y = np.argsort(y)
-        # Calculate the weighted ranks
-        weighted_ranks_x = np.average(ranks_x, weights=weights)
-        weighted_ranks_y = np.average(ranks_y, weights=weights)
-        # Calculate the Spearman correlation coefficient
-        correlation, p_value = spearmanr(ranks_x, ranks_y)
-        return correlation
+        ranks_x = scipy.stats.rankdata(x)
+        ranks_y = scipy.stats.rankdata(y)
+        # Calculate weighted covariance matrix
+        cov_matrix = np.cov(ranks_x, ranks_y, aweights=weights)
+        # Extract the diagonal elements (variances)
+        var_x = cov_matrix[0, 0]
+        var_y = cov_matrix[1, 1]
+        # Calculate the weighted Pearson correlation coefficient
+        weighted_corr = cov_matrix[0, 1] / np.sqrt(var_x * var_y)
+        # # Calculate the ranks of x and y
+        # ranks_x = np.argsort(x)
+        # ranks_y = np.argsort(y)
+        # # Calculate the weighted ranks
+        # weighted_ranks_x = np.average(ranks_x, weights=weights)
+        # weighted_ranks_y = np.average(ranks_y, weights=weights)
+        # # Calculate the Spearman correlation coefficient
+        # correlation, p_value = spearmanr(ranks_x, ranks_y)
+        return weighted_corr
     
     def weighted_correlations(x,y,ag):
         x1 = x.stack(flat=['lat','lon']).values
